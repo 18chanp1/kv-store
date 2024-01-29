@@ -6,6 +6,7 @@ import com.s82033788.CPEN431.A4.cache.RequestCacheKey;
 import com.s82033788.CPEN431.A4.cache.RequestCacheValue;
 import com.s82033788.CPEN431.A4.map.KeyWrapper;
 import com.s82033788.CPEN431.A4.map.ValueWrapper;
+import com.s82033788.CPEN431.A4.wrappers.ThreadSharedResource;
 import net.openhft.chronicle.map.ChronicleMap;
 import org.apache.commons.pool2.impl.AbandonedConfig;
 import org.apache.commons.pool2.impl.GenericObjectPool;
@@ -92,33 +93,37 @@ public class KVServer
 
 
 
-            GenericObjectPool<byte[]> bytePool
-                    = new GenericObjectPool<>(new ByteArrayFactory(), poolConfig, poolAbandonConfig);
+            GenericObjectPool<ThreadSharedResource> resourcePool
+                    = new GenericObjectPool<>(new SharedThreadResourceFactory(), poolConfig, poolAbandonConfig);
 
 
 
 
 
             while(true){
-                byte [] iBuf = bytePool.borrowObject();
+                ThreadSharedResource resource = resourcePool.borrowObject();
 
+                byte[] iBuf = resource.getByteArr();
                 DatagramPacket iPacket = new DatagramPacket(iBuf, iBuf.length);
                 server.receive(iPacket);
 
                 ThreadPoolExecutor tpe = (ThreadPoolExecutor) executor;
 
+                //TODO move memory / cache checking code here, and return "overload" instead.
+
 
 
                 executor.execute(new KVServerTaskHandler(
                         iPacket,
-                        server,
                         requestCache,
                         map,
                         mapLock,
                         tpe,
                         bytesUsed,
                         bytesUsedLock,
-                        bytePool));
+                        resourcePool,
+                        resource,
+                        server));
 
             }
 
@@ -129,7 +134,7 @@ public class KVServer
             //System.err.println("Server IO exception.");
             throw new RuntimeException(e);
         } catch (Exception e) {
-            System.err.println("Bytepool exception");
+            //System.err.println("Bytepool exception");
             throw new RuntimeException(e);
         }
 

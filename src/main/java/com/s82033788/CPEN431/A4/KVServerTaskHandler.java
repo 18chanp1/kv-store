@@ -8,10 +8,7 @@ import com.s82033788.CPEN431.A4.map.KeyWrapper;
 import com.s82033788.CPEN431.A4.map.ValueWrapper;
 import com.s82033788.CPEN431.A4.proto.KeyValueRequest.KVRequest;
 import com.s82033788.CPEN431.A4.proto.Message.Msg;
-import com.s82033788.CPEN431.A4.wrappers.PB_ContentType;
-import com.s82033788.CPEN431.A4.wrappers.PublicBuffer;
-import com.s82033788.CPEN431.A4.wrappers.UnwrappedMessage;
-import com.s82033788.CPEN431.A4.wrappers.UnwrappedPayload;
+import com.s82033788.CPEN431.A4.wrappers.*;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import java.io.IOException;
@@ -30,22 +27,25 @@ import static com.s82033788.CPEN431.A4.cache.ResponseType.*;
 public class KVServerTaskHandler implements Runnable {
     private final AtomicInteger bytesUsed;
     private final Lock bytesUsedLock;
-    private DatagramPacket iPacket;
-    private DatagramSocket socket;
-    private Cache<RequestCacheKey, RequestCacheValue> requestCache;
-    private ConcurrentMap<KeyWrapper, ValueWrapper> map;
-    private ReadWriteLock mapLock;
+    private final DatagramPacket iPacket;
+    private final DatagramSocket socket;
+    private final Cache<RequestCacheKey, RequestCacheValue> requestCache;
+    private final ConcurrentMap<KeyWrapper, ValueWrapper> map;
+    private final ReadWriteLock mapLock;
     //this is concurrently inconsequential, they can just try again later.
-    private ThreadPoolExecutor tpe;
+    private final ThreadPoolExecutor tpe;
     private boolean responseSent = false;
     private PublicBuffer incomingPublicBuffer;
-
     final private GenericObjectPool bytePool;  //this is thread safe
+
+    final private ThreadSharedResource resources;
 
     // Constants
     final static int KEY_MAX_LEN = 32;
     final static int VALUE_MAX_LEN = 10_000;
     final static int MEMORY_SAFETY = 524_288;
+
+    // Response codes
     public final static int RES_CODE_INVALID_KEY = 0x6;
     public final static int RES_CODE_INVALID_VALUE = 0x7;
     public final static int RES_CODE_INVALID_OPCODE = 0x5;
@@ -62,16 +62,17 @@ public class KVServerTaskHandler implements Runnable {
     public final static int THREAD_OVL_WAIT_TIME = 10;
 
     public KVServerTaskHandler(DatagramPacket iPacket,
-                               DatagramSocket socket,
                                Cache<RequestCacheKey, RequestCacheValue> requestCache,
                                ConcurrentMap<KeyWrapper, ValueWrapper> map,
                                ReadWriteLock mapLock,
                                ThreadPoolExecutor tpe,
                                AtomicInteger bytesUsed,
                                Lock bytesUsedLock,
-                               GenericObjectPool<byte[]> bytePool) {
+                               GenericObjectPool<ThreadSharedResource> bytePool,
+                               ThreadSharedResource resource,
+                               DatagramSocket server) {
         this.iPacket = iPacket;
-        this.socket = socket;
+        this.socket = server;
         this.requestCache = requestCache;
         this.map = map;
         this.mapLock = mapLock;
@@ -79,6 +80,7 @@ public class KVServerTaskHandler implements Runnable {
         this.bytesUsed = bytesUsed;
         this.bytesUsedLock = bytesUsedLock;
         this.bytePool = bytePool;
+        this.resources = resource;
     }
 
 
@@ -86,7 +88,7 @@ public class KVServerTaskHandler implements Runnable {
     public void run()
     {
         mainHandlerFunction();
-        bytePool.returnObject(iPacket.getData());
+        bytePool.returnObject(resources);
     }
 
     public void mainHandlerFunction() {
@@ -116,7 +118,7 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue reply;
         try {
             reply = requestCache.get(new RequestCacheKey(unwrappedMessage.getReqID().toByteArray(), unwrappedMessage.getCrc()),
-                    () -> newProcessRequest(unwrappedMessage));
+                    () -> createAndSendResponse(unwrappedMessage));
         } catch (ExecutionException e) {
             //TODO deal with this
             throw new RuntimeException(e);
@@ -154,7 +156,7 @@ public class KVServerTaskHandler implements Runnable {
         }
     }
 
-    private RequestCacheValue newProcessRequest(UnwrappedMessage unwrappedMessage) throws
+    private RequestCacheValue createAndSendResponse(UnwrappedMessage unwrappedMessage) throws
             IOException {
 
 
@@ -187,7 +189,6 @@ public class KVServerTaskHandler implements Runnable {
         }
 
         //overload
-        //TODO replace cache to reference inside map, rather than whole packet.
         if(requestCache.size() >= KVServer.CACHE_SZ){
             System.out.println("Cache overflow. Delay Requested");
             RequestCacheValue res = new RequestCacheValue.Builder(unwrappedMessage.getCrc(),

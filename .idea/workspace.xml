@@ -10,14 +10,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="aa5b750f-3817-40da-9bf9-8b03b0642e37" name="Changes" comment="implemented the public buffer for outgoing packets.">
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/ByteArrayFactory.java" afterDir="false" />
+    <list default="true" id="aa5b750f-3817-40da-9bf9-8b03b0642e37" name="Changes" comment="fixed the memory leak by pooling byte arrays">
+      <change afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/ThreadSharedResource.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/ByteArrayFactory.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/SharedThreadResourceFactory.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServer.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServerTaskHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServerTaskHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/cache/RequestCacheValue.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/cache/RequestCacheValue.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/PublicBuffer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/PublicBuffer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/UnwrappedPayload.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/UnwrappedPayload.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -54,7 +54,7 @@
     <scope name="WrittenCode" pattern="(src:com.s82033788.CPEN431.A4..*||src:com.s82033788.CPEN431.A4.cache..*||src:com.s82033788.CPEN431.A4.map..*||src:com.s82033788.CPEN431.A4.wrappers..*)&amp;&amp;!src:com.s82033788.CPEN431.A4.proto..*" />
   </component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="ProjectErrors" />
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 2
@@ -65,36 +65,36 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Application.KVServer.executor": "Coverage",
-    "Downloaded.Files.Path.Enabled": "false",
-    "Maven. [org.apache.maven.plugins:maven-archetype-plugin:RELEASE:generate].executor": "Run",
-    "Maven.App.executor": "Run",
-    "Maven.CPEN431_2024_A4_82033788 [clean].executor": "Run",
-    "Maven.CPEN431_2024_A4_82033788 [install...].executor": "Run",
-    "Maven.CPEN431_2024_A4_82033788 [install].executor": "Run",
-    "Maven.KVServer.executor": "Run",
-    "Repository.Attach.Annotations": "false",
-    "Repository.Attach.JavaDocs": "false",
-    "Repository.Attach.Sources": "false",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "/Users/18chanp1/Documents/cpen431/CPEN431_2024_A4_82033788/src/main",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Libraries",
-    "project.structure.proportion": "0.15",
-    "project.structure.side.proportion": "0.2",
-    "run.code.analysis.last.selected.profile": "pProject Default",
-    "settings.editor.selected.configurable": "reference.settings.project.maven.repository.indices",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Application.KVServer.executor&quot;: &quot;Coverage&quot;,
+    &quot;Downloaded.Files.Path.Enabled&quot;: &quot;false&quot;,
+    &quot;Maven. [org.apache.maven.plugins:maven-archetype-plugin:RELEASE:generate].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.App.executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CPEN431_2024_A4_82033788 [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CPEN431_2024_A4_82033788 [install...].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.CPEN431_2024_A4_82033788 [install].executor&quot;: &quot;Run&quot;,
+    &quot;Maven.KVServer.executor&quot;: &quot;Run&quot;,
+    &quot;Repository.Attach.Annotations&quot;: &quot;false&quot;,
+    &quot;Repository.Attach.JavaDocs&quot;: &quot;false&quot;,
+    &quot;Repository.Attach.Sources&quot;: &quot;false&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/18chanp1/Documents/cpen431/CPEN431_2024_A4_82033788/src/main&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Artifacts&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.32413793&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settings.project.maven.repository.indices&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/src/main" />
@@ -113,7 +113,9 @@
     <configuration name="KVServer" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="com.s82033788.CPEN431.A4.KVServer" />
       <module name="CPEN431_2024_A4_82033788" />
-      <option name="VM_PARAMETERS" value="-Xmx64m --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED" />
+      <projectPathOnTarget name="projectPathOnTarget" value="/home/ubuntu/CPEN431_2024_A4_82033788" />
+      <target name="@@@LOCAL@@@" />
+      <option name="VM_PARAMETERS" value="-Xmx32m --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED" />
       <extension name="coverage">
         <pattern>
           <option name="PATTERN" value="com.s82033788.CPEN431.A4.map.*" />
@@ -241,7 +243,15 @@
       <workItem from="1705898181800" duration="9829000" />
       <workItem from="1705909362157" duration="1050000" />
       <workItem from="1705950673566" duration="33658000" />
-      <workItem from="1706064663244" duration="4588000" />
+      <workItem from="1706064663244" duration="6274000" />
+      <workItem from="1706124002921" duration="1354000" />
+      <workItem from="1706125367644" duration="1206000" />
+      <workItem from="1706383403210" duration="65000" />
+      <workItem from="1706477506570" duration="8414000" />
+      <workItem from="1706488865561" duration="203000" />
+      <workItem from="1706489077614" duration="143000" />
+      <workItem from="1706489227621" duration="1175000" />
+      <workItem from="1706494006207" duration="3861000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <option name="closed" value="true" />
@@ -323,7 +333,15 @@
       <option name="project" value="LOCAL" />
       <updated>1706061783108</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="fixed the memory leak by pooling byte arrays">
+      <option name="closed" value="true" />
+      <created>1706071571772</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1706071571772</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -362,42 +380,15 @@
     <MESSAGE value="small refactoring" />
     <MESSAGE value="concurrency issues fix" />
     <MESSAGE value="implemented the public buffer for outgoing packets." />
-    <option name="LAST_COMMIT_MESSAGE" value="implemented the public buffer for outgoing packets." />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="java-line">
-          <condition expression="iPacket.length &gt; 10000" language="JAVA" />
-          <url>file://$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServerTaskHandler.java</url>
-          <line>274</line>
-          <option name="timeStamp" value="64" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <condition expression="iPacket.length &gt; 10000" language="JAVA" />
-          <url>file://$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServerTaskHandler.java</url>
-          <line>270</line>
-          <option name="timeStamp" value="65" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/PublicBuffer.java</url>
-          <line>128</line>
-          <option name="timeStamp" value="67" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/PublicBuffer.java</url>
-          <line>156</line>
-          <option name="timeStamp" value="68" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+    <MESSAGE value="fixed the memory leak by pooling byte arrays" />
+    <option name="LAST_COMMIT_MESSAGE" value="fixed the memory leak by pooling byte arrays" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
     <select />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/CPEN431_2024_A4_82033788$KVServer.ic" NAME="KVServer Coverage Results" MODIFIED="1706059692236" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false">
+    <SUITE FILE_PATH="coverage/CPEN431_2024_A4_82033788$KVServer.ic" NAME="KVServer Coverage Results" MODIFIED="1706478588456" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false">
       <FILTER>com.s82033788.CPEN431.A4.map.*</FILTER>
     </SUITE>
   </component>

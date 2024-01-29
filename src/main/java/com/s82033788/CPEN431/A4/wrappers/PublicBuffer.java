@@ -6,12 +6,11 @@ import java.util.Arrays;
 import java.util.zip.CRC32;
 
 public class PublicBuffer {
-    private byte[] buf;
-
+    private final byte[] buf;
     private int len;
     private PB_ContentType contentType;
     private int idOffset;
-    Closeable currentStream;
+    private Closeable currentStream;
 
 
     public PublicBuffer(byte[] backingArray, PB_ContentType type, int length) {
@@ -210,7 +209,6 @@ public class PublicBuffer {
     public class PB_DummyStream implements Closeable {
         @Override
         public void close() throws IOException {
-            return;
         }
     }
     public static final class ContentMismatchException extends IllegalStateException {

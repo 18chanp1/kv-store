@@ -3,7 +3,7 @@ package com.s82033788.CPEN431.A4.wrappers;
 public class UnwrappedPayload {
     private final int command;
     private final byte[] key;
-    private byte[] value;
+    private final byte[] value;
     private final int version; //defaults to zero anyways, no logic
 
     private final boolean keyExists;
