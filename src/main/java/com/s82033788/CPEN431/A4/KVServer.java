@@ -30,7 +30,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class KVServer
 {
-    final static int PORT = 13788;
+    final static int PORT = 13790;
     final static int N_THREADS = 8 ; //TODO tune by profiler
     static final int PACKET_MAX = 16384;
     final static long  CACHE_SZ = 65536;//TODO tune by profiler

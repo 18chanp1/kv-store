@@ -99,15 +99,15 @@ public class KVServerTaskHandler implements Runnable {
         try {
             unwrappedMessage = unpackPacket(iPacket);
         } catch (IOException e) {
-            //System.err.println("Packet does not match .proto");
-            //System.err.println(e);
-            //System.err.println("Stopping packet handling and returning");
+            System.err.println("Packet does not match .proto");
+            System.err.println(e);
+            System.err.println("Stopping packet handling and returning");
 
             //No response, like A1/A2
             return;
         } catch (InvalidChecksumException e) {
-            //System.err.println("Packet checksum does not match");
-            //System.err.println("Stopping packet handling and returning");
+            System.err.println("Packet checksum does not match");
+            System.err.println("Stopping packet handling and returning");
 
             //no response, like A1/A2
             return;
@@ -138,8 +138,8 @@ public class KVServerTaskHandler implements Runnable {
 
                 sendResponse(res.generatePacket());
             } catch (IOException e) {
-                //System.err.println("Unable to send mismatched retry due to IO");
-                //System.err.println("Will not send response packet");
+                System.err.println("Unable to send mismatched retry due to IO");
+                System.err.println("Will not send response packet");
             }
             return;
         }
@@ -150,8 +150,8 @@ public class KVServerTaskHandler implements Runnable {
             try {
                 sendResponse(reply.generatePacket());
             } catch (IOException e) {
-                //System.err.println("Unable to send cached response due to IO");
-                //System.err.println("Will not send response packet");
+                System.err.println("Unable to send cached response due to IO");
+                System.err.println("Will not send response packet");
             }
         }
     }
@@ -171,16 +171,16 @@ public class KVServerTaskHandler implements Runnable {
         try {
             payload = unpackPayload(unwrappedMessage.getPayload());
         }  catch (ValueLengthException e) {
-            //System.err.println("Value field exceeds size");
-            //System.err.println("Sending rejection packet");
+            System.err.println("Value field exceeds size");
+            System.err.println("Sending rejection packet");
             RequestCacheValue res;
             scaf.setResponseType(INVALID_VALUE);
             res = scaf.build();
             sendResponse(res.generatePacket());
             return res;
         } catch (KeyLengthException e) {
-            //System.err.println("Value field exceeds size");
-            //System.err.println("Sending rejection packet");
+            System.err.println("Value field exceeds size");
+            System.err.println("Sending rejection packet");
 
             scaf.setResponseType(INVALID_KEY);
             RequestCacheValue res = scaf.build();
@@ -416,9 +416,9 @@ public class KVServerTaskHandler implements Runnable {
                 return new ValueWrapper(payload.getValue(), payload.getVersion());
             } catch (IOException e) {
                 ioexception.set(e);
-                //System.err.println(e);
-                //System.err.println("Socket exception when returning result of PUT");
-                //System.err.println("Reply packet will not be sent");
+                System.err.println(e);
+                System.err.println("Socket exception when returning result of PUT");
+                System.err.println("Reply packet will not be sent");
             }
             return value;
         });
@@ -463,9 +463,9 @@ public class KVServerTaskHandler implements Runnable {
                 sendResponse(res.get().generatePacket());
                 return value;
             } catch (IOException e) {
-                //System.err.println(e);
-                //System.err.println("Socket exception when returning result of GET");
-                //System.err.println("Reply packet will not be sent");
+                System.err.println(e);
+                System.err.println("Socket exception when returning result of GET");
+                System.err.println("Reply packet will not be sent");
                 ioexception.set(e);
             }
             return value;
@@ -511,9 +511,9 @@ public class KVServerTaskHandler implements Runnable {
                     return null;
                 }
             } catch (IOException e) {
-                //System.err.println(e);
-                //System.err.println("Socket exception when returning result of GET");
-                //System.err.println("Reply packet will not be sent");
+                System.err.println(e);
+                System.err.println("Socket exception when returning result of GET");
+                System.err.println("Reply packet will not be sent");
                 ioexception.set(e);
             }
             return value;

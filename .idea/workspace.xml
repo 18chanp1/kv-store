@@ -10,14 +10,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="aa5b750f-3817-40da-9bf9-8b03b0642e37" name="Changes" comment="fixed the memory leak by pooling byte arrays">
-      <change afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/ThreadSharedResource.java" afterDir="false" />
+    <list default="true" id="aa5b750f-3817-40da-9bf9-8b03b0642e37" name="Changes" comment="small changes to use the wrapper around byte array and socket for now.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/ByteArrayFactory.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/SharedThreadResourceFactory.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServer.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServerTaskHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServerTaskHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/PublicBuffer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/PublicBuffer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/UnwrappedPayload.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/UnwrappedPayload.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/ThreadSharedResource.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/wrappers/ThreadSharedResource.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -69,6 +66,7 @@
   &quot;keyToString&quot;: {
     &quot;Application.KVServer.executor&quot;: &quot;Coverage&quot;,
     &quot;Downloaded.Files.Path.Enabled&quot;: &quot;false&quot;,
+    &quot;JAR Application.Remote.executor&quot;: &quot;Run&quot;,
     &quot;Maven. [org.apache.maven.plugins:maven-archetype-plugin:RELEASE:generate].executor&quot;: &quot;Run&quot;,
     &quot;Maven.App.executor&quot;: &quot;Run&quot;,
     &quot;Maven.CPEN431_2024_A4_82033788 [clean].executor&quot;: &quot;Run&quot;,
@@ -87,11 +85,11 @@
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Artifacts&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.32413793&quot;,
     &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settings.project.maven.repository.indices&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;web.server&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
@@ -165,6 +163,14 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <configuration name="Remote" type="JarApplication">
+      <target name="ubuntu@50.112.44.139:22" />
+      <option name="JAR_PATH" value="$PROJECT_DIR$/target/CPEN431_2024_A4_82033788-1.0-SNAPSHOT-jar-with-dependencies.jar" />
+      <option name="VM_PARAMETERS" value="-Xmx32m --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED --add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-opens=jdk.compiler/com.sun.tools.javac=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="ALTERNATIVE_JRE_PATH" />
+      <method v="2" />
+    </configuration>
     <configuration default="true" type="MavenRunConfiguration" factoryName="Maven">
       <MavenSettings>
         <option name="myGeneralSettings" />
@@ -197,6 +203,7 @@
     </configuration>
     <list>
       <item itemvalue="Application.KVServer" />
+      <item itemvalue="JAR Application.Remote" />
       <item itemvalue="JUnit.java in CPEN431_2024_A4_82033788" />
       <item itemvalue="JUnit.KVServerTest" />
       <item itemvalue="JUnit.KVServerTest.main" />
@@ -251,7 +258,13 @@
       <workItem from="1706488865561" duration="203000" />
       <workItem from="1706489077614" duration="143000" />
       <workItem from="1706489227621" duration="1175000" />
-      <workItem from="1706494006207" duration="3861000" />
+      <workItem from="1706494006207" duration="13171000" />
+      <workItem from="1706514129587" duration="2610000" />
+      <workItem from="1706517423127" duration="502000" />
+      <workItem from="1706518968292" duration="343000" />
+      <workItem from="1706557576159" duration="565000" />
+      <workItem from="1706558211154" duration="1103000" />
+      <workItem from="1706566975650" duration="333000" />
     </task>
     <task id="LOCAL-00001" summary="initial commit">
       <option name="closed" value="true" />
@@ -341,7 +354,15 @@
       <option name="project" value="LOCAL" />
       <updated>1706071571772</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="small changes to use the wrapper around byte array and socket for now.">
+      <option name="closed" value="true" />
+      <created>1706503569106</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1706503569106</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -358,7 +379,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="origin/main" />
+                        <option value="public-buffer" />
                       </list>
                     </value>
                   </entry>
@@ -381,7 +402,19 @@
     <MESSAGE value="concurrency issues fix" />
     <MESSAGE value="implemented the public buffer for outgoing packets." />
     <MESSAGE value="fixed the memory leak by pooling byte arrays" />
-    <option name="LAST_COMMIT_MESSAGE" value="fixed the memory leak by pooling byte arrays" />
+    <MESSAGE value="small changes to use the wrapper around byte array and socket for now." />
+    <option name="LAST_COMMIT_MESSAGE" value="small changes to use the wrapper around byte array and socket for now." />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/com/s82033788/CPEN431/A4/KVServerTaskHandler.java</url>
+          <line>101</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
@@ -391,5 +424,6 @@
     <SUITE FILE_PATH="coverage/CPEN431_2024_A4_82033788$KVServer.ic" NAME="KVServer Coverage Results" MODIFIED="1706478588456" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false">
       <FILTER>com.s82033788.CPEN431.A4.map.*</FILTER>
     </SUITE>
+    <SUITE FILE_PATH="coverage/CPEN431_2024_A4_82033788$Remote.ic" NAME="Remote Coverage Results" MODIFIED="1706519250901" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" />
   </component>
 </project>
