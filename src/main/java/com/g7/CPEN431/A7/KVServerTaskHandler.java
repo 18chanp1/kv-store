@@ -818,8 +818,23 @@ public class KVServerTaskHandler implements Runnable {
         if (pairs.size() > 0) {
             try {
                 DatagramSocket socket = new DatagramSocket();
-                KVClient sender = new KVClient(address, 0, socket, new byte[16384]);
-                sender.bulkPut(pairs);
+                KVClient sender = new KVClient(address, port, socket, new byte[16384]);
+
+                //Split pairs in case size of pairs too large for packet
+                List<PutPair> temp = new ArrayList<>();
+                int currPacketSize = 0;
+                for (PutPair pair : pairs) {
+                    byte[] pair_bytes = PutPairSerializer.serialize(pair);
+                    if (pair_bytes.length + currPacketSize > 16384) {
+                        sender.bulkPut(temp);
+                        temp.clear();
+                        currPacketSize = 0;
+                    } else {
+                        temp.add(pair);
+                        currPacketSize += pair_bytes.length;
+                    }
+                }
+
                 socket.close();
             } catch (Exception e){
                 System.out.println("Error sending bulk put to transfer keys");
