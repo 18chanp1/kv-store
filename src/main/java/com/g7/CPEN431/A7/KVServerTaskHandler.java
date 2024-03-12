@@ -798,10 +798,10 @@ public class KVServerTaskHandler implements Runnable {
                         sender.bulkPut(temp);
                         temp.clear();
                         currPacketSize = 0;
-                    } else {
-                        temp.add(pair);
-                        currPacketSize += pair_bytes.length;
                     }
+
+                    temp.add(pair);
+                    currPacketSize += pair_bytes.length;
                 }
 
                 sender.bulkPut(temp);
