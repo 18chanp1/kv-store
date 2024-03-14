@@ -37,7 +37,7 @@
         <configuration>
           <archive>
             <manifest>
-              <mainClass>com.g7.CPEN431.A7.KVServer</mainClass>
+              <mainClass>com.g7.CPEN431.A9.KVServer</mainClass>
             </manifest>
           </archive>
           <descriptorRefs>
