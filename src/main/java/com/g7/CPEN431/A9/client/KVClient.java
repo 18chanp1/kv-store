@@ -360,7 +360,7 @@ public class KVClient {
         {
             while(true)
             {
-                socket.receive(p);
+                socket.receive(rP);
             }
         } catch (SocketTimeoutException e)
         {
