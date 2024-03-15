@@ -131,14 +131,14 @@ public class DeathRegistrar extends TimerTask {
         }
 
 
-        for(int i = 0; i < l.size(); i++)
-        {
-            if(responses.get(i) == KVServerTaskHandler.STAT_CODE_OLD && random.nextInt(K) == 0)
-            {
-                //delete the response
-                broadcastQueue.remove( (ServerRecord) l.get(i));
-            }
-        }
+//        for(int i = 0; i < l.size(); i++)
+//        {
+//            if(responses.get(i) == KVServerTaskHandler.STAT_CODE_OLD && random.nextInt(K) == 0)
+//            {
+//                //delete the response
+//                broadcastQueue.remove( (ServerRecord) l.get(i));
+//            }
+//        }
 
         /* Mark the gosipee as alive */
         ring.setServerAlive(target);
