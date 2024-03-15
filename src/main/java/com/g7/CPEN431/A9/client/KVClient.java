@@ -354,13 +354,14 @@ public class KVClient {
 
         UnwrappedMessage res = null;
 
+
         //clear the buffer
         socket.setSoTimeout(2);
         try
         {
             while(true)
             {
-                socket.receive(p);
+                socket.receive(rP);
             }
         } catch (SocketTimeoutException e)
         {
