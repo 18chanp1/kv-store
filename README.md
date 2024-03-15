@@ -20,6 +20,9 @@ Used Run Command:
   $N_THREADS \
 ```
 
+Please set the bash variable $i for port, $MEM_MAX for maximum memory alloc, and $N_THREADS for maximum amount
+of handler threads.
+
 ## Additional Notes on Running
 Some scripts are provided starting a large number of nodes on AWS instances.
 Please see ./scripts for details. 
