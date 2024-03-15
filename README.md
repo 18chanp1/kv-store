@@ -1,9 +1,9 @@
 # Something about the A7
 Group ID: 7
-Verification Code: 8ED311163D1E5151310CA99B4D8C9E92
+Verification Code: 49C23866D1C090D3821DA9D17F29E2D6
 Used Run Command:
 ``` shell
-  java -Xmx512m \
+ java -Xmx512m \
   -XX:+UseCompressedOops \
   --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED \
   --add-exports=java.base/sun.nio.ch=ALL-UNNAMED \
@@ -23,6 +23,10 @@ Used Run Command:
 ## Additional Notes on Running
 Some scripts are provided starting a large number of nodes on AWS instances.
 Please see ./scripts for details. 
+
+
+The servers list provided may be inaccurate since the IP address changes depending on where you run it. 
+However, the scripts below dynamically generate it based on what you write into the txt files. 
 
 ### Prerequisites
 - You need to upload the CPEN 431 public key to the AWS instance
