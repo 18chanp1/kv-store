@@ -48,6 +48,7 @@ public class KVClient {
     public final static int REQ_CODE_MEM = 0X08;
     public final static int REQ_CODE_DED = 0x100;
     public final static int REQ_CODE_BULKPUT = 0x200;
+    public final static int REQ_CODE_INIT_BACKUP = 0x201;
 
     public final static int RES_CODE_SUCCESS = 0x0;
     public final static int RES_CODE_NO_KEY = 0x1;
@@ -311,6 +312,13 @@ public class KVClient {
         }
 
         return res;
+    }
+
+    public ServerResponse initBackup() throws IOException, MissingValuesException, ServerTimedOutException, InterruptedException {
+        UnwrappedPayload pl = new UnwrappedPayload();
+        pl.setCommand(REQ_CODE_INIT_BACKUP);
+
+        return sendAndReceiveServerResponse(pl);
     }
 
      byte[] generateMsgID() throws UnknownHostException {

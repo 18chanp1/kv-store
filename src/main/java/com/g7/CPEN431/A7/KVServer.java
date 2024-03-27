@@ -1,6 +1,7 @@
 package com.g7.CPEN431.A7;
 
 import com.g7.CPEN431.A7.cache.RequestCacheKey;
+import com.g7.CPEN431.A7.client.KVClient;
 import com.g7.CPEN431.A7.consistentMap.ConsistentMap;
 import com.g7.CPEN431.A7.consistentMap.ServerRecord;
 import com.g7.CPEN431.A7.map.KeyWrapper;
@@ -15,6 +16,8 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,9 +44,9 @@ public class KVServer
     final static int GOSSIP_INTERVAL = 400;
     final static int GOSSIP_WAIT_INIT = 15_000;
     public final static int BULKPUT_MAX_SZ = 12000;
+    final static int NUM_REPLICAS = 3;
     public static ServerRecord self;
     public static ServerRecord selfLoopback;
-
 
     public static void main( String[] args )
     {
@@ -62,11 +65,11 @@ public class KVServer
             selfLoopback = new ServerRecord(InetAddress.getLoopbackAddress(), PORT);
 
 
-
             DatagramSocket server = new DatagramSocket(PORT);
             /* Eliminated in single thread */
             ExecutorService executor = Executors.newCachedThreadPool();
 
+            /* Primary KVStore for holding data that actually belongs to this server */
             ConcurrentMap<KeyWrapper, ValueWrapper> map
                     = ChronicleMap
                     .of(KeyWrapper.class, ValueWrapper.class)
@@ -75,6 +78,23 @@ public class KVServer
                     .entries(MAP_ENTRIES)
                     .averageValueSize(AVG_VAL_SZ)
                     .create();
+
+            /* Initialize KVStores for holding replicas of other servers */
+            /* serverRecord will be updated when the parent server sends an init_backup request */
+            List<ParentServerRecord> parentServers = new ArrayList<>();
+            for (int i = 0; i < NUM_REPLICAS; i++) {
+                ConcurrentMap<KeyWrapper, ValueWrapper> backupKVStore
+                        = ChronicleMap
+                        .of(KeyWrapper.class, ValueWrapper.class)
+                        .name("KVStore" + i)
+                        .averageKeySize(AVG_KEY_SZ)
+                        .entries(MAP_ENTRIES)
+                        .averageValueSize(AVG_VAL_SZ)
+                        .create();
+                ServerRecord parent = null;
+                ParentServerRecord parentServer = new ParentServerRecord(parent, backupKVStore);
+                parentServers.add(parentServer);
+            }
 
             /*
             * Explanation of the mapLock.
@@ -135,6 +155,16 @@ public class KVServer
             timer.schedule(new DeathRegistrar(pendingRecordDeaths, serverRing, lastReqTime), GOSSIP_WAIT_INIT, GOSSIP_INTERVAL);
 
 
+            /* Send request to all backup servers to notify them that we are their parent */
+            byte[] byteArr = new byte[16384];
+            KVClient sender = new KVClient(byteArr);
+
+            for (int i = 0; i < NUM_REPLICAS; i++) {
+                ServerRecord backup = serverRing.getNextServer();
+                sender.setDestination(backup.getAddress(), backup.getServerPort());
+                sender.initBackup();
+            }
+
             while(true){
 
                 Runtime r = Runtime.getRuntime();
@@ -153,6 +183,7 @@ public class KVServer
                         requestCache,
                         map,
                         mapLock,
+                        parentServers,
                         bytesUsed,
                         bytePool,
                         isOverloaded,

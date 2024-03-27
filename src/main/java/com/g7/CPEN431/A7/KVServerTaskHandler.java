@@ -2,11 +2,7 @@ package com.g7.CPEN431.A7;
 
 import com.g7.CPEN431.A7.cache.RequestCacheKey;
 import com.g7.CPEN431.A7.cache.RequestCacheValue;
-import com.g7.CPEN431.A7.cache.ResponseType;
-import com.g7.CPEN431.A7.client.KVClient;
-import com.g7.CPEN431.A7.client.ServerResponse;
 import com.g7.CPEN431.A7.consistentMap.ConsistentMap;
-import com.g7.CPEN431.A7.consistentMap.ForwardList;
 import com.g7.CPEN431.A7.consistentMap.ServerRecord;
 import com.g7.CPEN431.A7.map.KeyWrapper;
 import com.g7.CPEN431.A7.map.ValueWrapper;
@@ -22,13 +18,10 @@ import com.google.common.cache.Cache;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.*;
-import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -37,7 +30,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.*;
 import static com.g7.CPEN431.A7.cache.ResponseType.*;
-import static com.g7.CPEN431.A7.consistentMap.ServerRecord.CODE_ALI;
 import static com.g7.CPEN431.A7.consistentMap.ServerRecord.CODE_DED;
 
 public class KVServerTaskHandler implements Runnable {
@@ -53,6 +45,7 @@ public class KVServerTaskHandler implements Runnable {
      */
     private final ConcurrentMap<KeyWrapper, ValueWrapper> map;
     private final ReadWriteLock mapLock;
+    private final List<ParentServerRecord> parentServers;
     private boolean responseSent = false;
     private PublicBuffer incomingPublicBuffer;
     /**
@@ -87,6 +80,7 @@ public class KVServerTaskHandler implements Runnable {
     /* Request Codes */
     public final static int REQ_CODE_PUT = 0x01;
 
+    public final static int REQ_CODE_INIT_BACKUP = 0x201;
     public final static int REQ_CODE_BULKPUT = 0x200;
     public final static int REQ_CODE_GET = 0X02;
     public final static int REQ_CODE_DEL = 0X03;
@@ -107,6 +101,7 @@ public class KVServerTaskHandler implements Runnable {
                                Cache<RequestCacheKey, DatagramPacket> requestCache,
                                ConcurrentMap<KeyWrapper, ValueWrapper> map,
                                ReadWriteLock mapLock,
+                               List<ParentServerRecord> parentServers,
                                AtomicInteger bytesUsed,
                                ConcurrentLinkedQueue<byte[]> bytePool,
                                boolean isOverloaded,
@@ -119,6 +114,7 @@ public class KVServerTaskHandler implements Runnable {
         this.requestCache = requestCache;
         this.map = map;
         this.mapLock = mapLock;
+        this.parentServers = parentServers;
         this.bytesUsed = bytesUsed;
         this.bytePool = bytePool;
         this.isOverloaded = isOverloaded;
@@ -136,6 +132,7 @@ public class KVServerTaskHandler implements Runnable {
         this.requestCache = null;
         this.map = null;
         this.mapLock = null;
+        this.parentServers = null;
         this.bytesUsed = null;
         this.bytePool = null;
         this.isOverloaded = false;
@@ -151,6 +148,7 @@ public class KVServerTaskHandler implements Runnable {
         this.requestCache = null;
         this.map = map;
         this.mapLock = mapLock;
+        this.parentServers = null;
         this.bytesUsed = bytesUsed;
         this.bytePool = null;
         this.isOverloaded = false;
@@ -320,6 +318,7 @@ public class KVServerTaskHandler implements Runnable {
             case REQ_CODE_MEM: res = handleGetMembershipCount(scaf, payload);  break;
             case REQ_CODE_DED: res = handleDeathUpdate(scaf, payload); break;
             case REQ_CODE_BULKPUT: res = handleBulkPut(scaf, payload); break;
+            case REQ_CODE_INIT_BACKUP: res = handleInitBackup(scaf, payload); break;
 
             default: {
                 RequestCacheValue val = scaf.setResponseType(INVALID_OPCODE).build();
@@ -598,6 +597,42 @@ public class KVServerTaskHandler implements Runnable {
 
             mapLock.readLock().unlock();
         }
+    }
+
+    /**
+     * Handle request to initialize a backup server. This request is sent from parent server to backup server which will hold replicas
+     * @param scaf Scaffold builder for Request CacheValue that is partially filled in (with IP / port etc.)
+     * @param payload Payload from the client
+     * @return The packet sent
+     */
+    private DatagramPacket handleInitBackup (RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
+        if(payload.hasValue() || payload.hasVersion() || payload.hasKey())
+        {
+            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            return generateAndSend(res);
+        }
+
+        ServerRecord parentServer = new ServerRecord(scaf.getAddress(), scaf.getPort());
+
+
+        for (int i = 0; i < NUM_REPLICAS; i++) {
+            /* We have already initialized for this server,
+            e.g. in the case where parent server initialized, went offline, and came back on again */
+
+            if(parentServers.get(i).getServerRecord().equals(parentServer)) {
+                break;
+            }
+
+            //Found slot in parentServers list that is available for storing
+            else if(parentServers.get(i).getServerRecord() == null)
+            {
+                parentServers.get(i).setServerRecord(parentServer);
+                break;
+            }
+        }
+
+        RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
+        return generateAndSend(res);
     }
 
     /**

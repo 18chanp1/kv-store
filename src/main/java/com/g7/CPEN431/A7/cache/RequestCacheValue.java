@@ -164,6 +164,15 @@ public class RequestCacheValue implements KVResponse {
             return new RequestCacheValue(this);
         }
 
+        //I'm sorry for adding these but i needed the address
+        public InetAddress getAddress() {
+            return b_address;
+        }
+
+        public int getPort() {
+            return b_port;
+        }
+
 
     }
 
