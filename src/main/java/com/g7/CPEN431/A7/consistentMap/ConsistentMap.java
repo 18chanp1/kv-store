@@ -124,9 +124,11 @@ public class ConsistentMap {
      */
     private ServerRecord getServerWithHashcode(int hashcode)
     {
+        lock.readLock().lock();
         Map.Entry<Integer, VNode> server = ring.ceilingEntry(hashcode);
         /* Deal with case where the successor of the key is past "0" */
         server = (server == null) ? ring.firstEntry(): server;
+        lock.readLock().unlock();
 
         return server.getValue().serverRecord;
     }
