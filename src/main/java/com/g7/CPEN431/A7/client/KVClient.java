@@ -84,6 +84,19 @@ public class KVClient {
 
     public void setDestination(InetAddress serverAddress, int serverPort)
     {
+        if(this.socket != null && !this.socket.isClosed())
+        {
+            this.socket.close();
+        }
+
+        //create a new socket to clear the buffer.
+        try {
+            this.socket = new DatagramSocket();
+            this.socket.setSoTimeout(timeout);
+        } catch (SocketException e) {
+            throw new RuntimeException(e);
+        }
+
         this.serverAddress = serverAddress;
         this.serverPort = serverPort;
     }
@@ -344,21 +357,7 @@ public class KVClient {
     ServerResponse sendAndReceiveSingleServerResponse(UnwrappedMessage req) throws ServerTimedOutException, IOException {
         DatagramPacket rP = new DatagramPacket(publicBuf, publicBuf.length);
         int initTimeout = socket.getSoTimeout();
-        socket.setSoTimeout(2);
 
-        //clear the buffer
-        try
-        {
-            while(true)
-            {
-                socket.receive(rP);
-            }
-        } catch (SocketTimeoutException e)
-        {
-            //do nothing
-        }
-
-        socket.setSoTimeout(initTimeout);
 
         int tries = 0;
         boolean success = false;

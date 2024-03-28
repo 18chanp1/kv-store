@@ -190,7 +190,7 @@ public class DeathRegistrar extends TimerTask {
     private void checkSelfSuspended() {
         long currentTime = Instant.now().toEpochMilli();
         previousPingSendTime = previousPingSendTime == -1 ? currentTime : previousPingSendTime;
-        if (ring.getServerCount() != 1 && currentTime - previousPingSendTime > GOSSIP_INTERVAL + SUSPENDED_THRESHOLD) {
+        if (ring.getServerCount() != 1 && currentTime - lastReqTime.get() > GOSSIP_INTERVAL + SUSPENDED_THRESHOLD) {
             System.out.println("Suspension detected");
             // TODO: check for self loopback
             broadcastQueue.clear();
