@@ -73,7 +73,7 @@ public class ConsistentMap {
         /* Assumption: all servers in allRecords are alive during initialization
          * Assign backup servers to all servers in allRecords */
         for(ServerRecord record: allRecords.values()){
-            assignBackupServers(record);
+            assignInitialBackupServers(record);
         }
     }
 
@@ -347,14 +347,14 @@ public class ConsistentMap {
      * function that assigns backup servers for a primary server
      * @param self: the primary server
      */
-    private void assignBackupServers(ServerRecord self){
-        Set<ServerRecord> servers = new HashSet<>();
+    private void assignInitialBackupServers(ServerRecord self){
+        List<ServerRecord> servers = new ArrayList<>();
 
         /* when we have enough servers to assign as backup */
         if(getServerCount() >= REPLICATION_FACTOR) {
             /* assign servers until we have enough backup copies */
-            while (servers.size() < REPLICATION_FACTOR - 1) {
-                ServerRecord randomServer = getRandomServer();
+            for (int i = 0; i < REPLICATION_FACTOR - 1; i++) {
+                ServerRecord server = findBackupServer(servers);
                 // TODO: The value for this might need to get changed to optimize performance
                 /*
                  * under ideal scenarios, each server should only be the backup servers for REPLICATION_FACTOR - 1
@@ -362,14 +362,22 @@ public class ConsistentMap {
                  * A server being a backup for too many primary servers may run into memory shortage issues
                  * Currently set to REPLICATION_FACTOR
                  */
-
-                if(randomServer.getBackupServersFor().size() < REPLICATION_FACTOR) {
-                    servers.add(randomServer);
-                    randomServer.addBackupServersFor(self);
-                }
+                servers.add(server);
             }
-            self.setMyBackupServers(List.copyOf(servers));
+            self.setMyBackupServers(servers);
         }
+    }
+    private ServerRecord findBackupServer(List<ServerRecord> currentBackupServers){
+        Set<ServerRecord> servers = new HashSet<>(currentBackupServers);
+        ServerRecord server;
+        boolean isNew = false;
+        do{
+            server = getRandomServer();
+            if(server.getBackupServersFor().size() < REPLICATION_FACTOR) {
+                isNew = servers.add(server);
+            }
+        } while(!isNew);
+        return server;
     }
 
     public static class NoServersException extends IllegalStateException {}
