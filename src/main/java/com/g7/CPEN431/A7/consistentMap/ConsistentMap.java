@@ -363,11 +363,12 @@ public class ConsistentMap {
                  * Currently set to REPLICATION_FACTOR
                  */
                 servers.add(server);
+                server.addBackupServersFor(self);
             }
             self.setMyBackupServers(servers);
         }
     }
-    private ServerRecord findBackupServer(List<ServerRecord> currentBackupServers){
+    public ServerRecord findBackupServer(List<ServerRecord> currentBackupServers){
         Set<ServerRecord> servers = new HashSet<>(currentBackupServers);
         ServerRecord server;
         boolean isNew = false;

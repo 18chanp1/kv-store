@@ -78,7 +78,7 @@ public class KeyTransferHandler implements Runnable {
                     {
                         System.out.println("sending" + temp.size() + "pairs");
                         sender.setDestination(target.getAddress(), target.getPort());
-                        ServerResponse res = sender.bulkPut(temp);
+                        ServerResponse res = sender.bulkPut(temp, null);
                         temp.clear();
                         currPacketSize = 0;
                     }
@@ -89,7 +89,7 @@ public class KeyTransferHandler implements Runnable {
                 }
                 //clear the buffer.
                 System.out.println("sending" + temp.size() + "pairs");
-                if(temp.size() > 0) sender.bulkPut(temp);
+                if(temp.size() > 0) sender.bulkPut(temp, null);
             } catch (KVClient.ServerTimedOutException e) {
                 // TODO: Probably a wise idea to redirect the keys someplace else, but that is a problem for future me.
                 System.out.println("Bulk transfer timed out. Marking recipient as dead.");

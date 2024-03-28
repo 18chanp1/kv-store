@@ -1,6 +1,7 @@
 package com.g7.CPEN431.A7.client;
 
 
+import com.g7.CPEN431.A7.consistentMap.ServerRecord;
 import com.g7.CPEN431.A7.newProto.KVMsg.KVMsgFactory;
 import com.g7.CPEN431.A7.newProto.KVMsg.KVMsgSerializer;
 import com.g7.CPEN431.A7.newProto.KVRequest.KVRequestSerializer;
@@ -227,11 +228,12 @@ public class KVClient {
         return res;
     }
 
-    public ServerResponse bulkPut(List<PutPair> pairs) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse bulkPut(List<PutPair> pairs, ServerRecord primaryServer) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         UnwrappedPayload pl = new UnwrappedPayload();
         assert pairs != null;
         pl.setCommand(REQ_CODE_BULKPUT);
         pl.setPutPair(pairs);
+        pl.setPrimaryServer(primaryServer);
         return sendAndReceiveServerResponse(pl);
     }
 
