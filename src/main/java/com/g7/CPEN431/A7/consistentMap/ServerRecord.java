@@ -8,6 +8,8 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class ServerRecord implements ServerEntry {
@@ -20,8 +22,9 @@ public class ServerRecord implements ServerEntry {
     private boolean portExists = false;
     private boolean informationTimeExists = false;
     private boolean updateCodeExists = false;
-
-
+    private List<ServerRecord> my_backup_servers;
+    private List<ServerRecord> backup_servers_for;
+    private final static int REPLICATION_FACTOR = 4;
     public final static int CODE_ALI = 0x1;
     public final static int CODE_DED = 0x2;
 
@@ -34,6 +37,8 @@ public class ServerRecord implements ServerEntry {
         this.informationTimeExists = true;
         this.updateCode = 1;
         this.updateCodeExists = true;
+        this.backup_servers_for = new ArrayList<>();
+        this.my_backup_servers = new ArrayList<>();
     }
 
     /* Clone a ServerRecord */
@@ -168,13 +173,23 @@ public class ServerRecord implements ServerEntry {
         this.updateCode = code;
         this.updateCodeExists = true;
     }
-
+    public List<ServerRecord> getMyBackupServers() {
+        return this.my_backup_servers;
+    }
+    public void setMyBackupServers(List<ServerRecord> records){
+        this.my_backup_servers = records;
+    }
+    public List<ServerRecord> getBackupServersFor(){
+        return this.backup_servers_for;
+    }
+    public void setBackupServersFor(List<ServerRecord> records){
+        this.backup_servers_for = records;
+    }
     public boolean isAlive()
     {
         return this.updateCode == CODE_ALI;
     }
 
     public class HashNotGeneratedException extends Exception {}
-
 
 }
