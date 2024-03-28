@@ -20,6 +20,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.self;
 import static com.g7.CPEN431.A7.KVServer.selfLoopback;
+import static com.g7.CPEN431.A7.consistentMap.ServerRecord.REPLICATION_FACTOR;
 
 /**
  * A map API for a consistent hashing scheme.
@@ -67,6 +68,12 @@ public class ConsistentMap {
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+
+        /* Assumption: all servers in allRecords are alive during initialization
+         * Assign backup servers to all servers in allRecords */
+        for(ServerRecord record: allRecords.values()){
+            assignBackupServers(record);
         }
     }
 
@@ -334,6 +341,35 @@ public class ConsistentMap {
         }
         lock.readLock().unlock();
         return allServers;
+    }
+
+    /**
+     * function that assigns backup servers for a primary server
+     * @param self: the primary server
+     */
+    private void assignBackupServers(ServerRecord self){
+        Set<ServerRecord> servers = new HashSet<>();
+
+        /* when we have enough servers to assign as backup */
+        if(getServerCount() >= REPLICATION_FACTOR) {
+            /* assign servers until we have enough backup copies */
+            while (servers.size() < REPLICATION_FACTOR - 1) {
+                ServerRecord randomServer = getRandomServer();
+                // TODO: The value for this might need to get changed to optimize performance
+                /*
+                 * under ideal scenarios, each server should only be the backup servers for REPLICATION_FACTOR - 1
+                 * primary servers, performance degraded when random is not hitting on the exact server
+                 * A server being a backup for too many primary servers may run into memory shortage issues
+                 * Currently set to REPLICATION_FACTOR
+                 */
+
+                if(randomServer.getBackupServersFor().size() < REPLICATION_FACTOR) {
+                    servers.add(randomServer);
+                    randomServer.addBackupServersFor(self);
+                }
+            }
+            self.setMyBackupServers(List.copyOf(servers));
+        }
     }
 
     public static class NoServersException extends IllegalStateException {}

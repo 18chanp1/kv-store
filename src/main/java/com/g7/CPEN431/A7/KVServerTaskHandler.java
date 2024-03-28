@@ -534,7 +534,7 @@ public class KVServerTaskHandler implements Runnable {
             RequestCacheValue res = scaf.setResponseType(PUT).build();
             pkt.set(generateAndSend(res));
             bytesUsed.addAndGet(payload.getValue().length);
-            return new ValueWrapper(payload.getValue(), payload.getVersion());
+            return new ValueWrapper(payload.getValue(), payload.getVersion(), payload.getPrimaryServer());
         });
         mapLock.readLock().unlock();
 
@@ -556,18 +556,18 @@ public class KVServerTaskHandler implements Runnable {
 
 
 
-        bulkPutHelper(payload.getPutPair());
+        bulkPutHelper(payload);
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
         return generateAndSend(res);
     }
 
     //TODO fix later
-    public void bulkPutHelper(List<PutPair> pairs){
+    public void bulkPutHelper(UnwrappedPayload payload){
         assert map != null;
         assert mapLock != null;
         assert bytesUsed != null;
 
-
+        List<PutPair> pairs = payload.getPutPair();
         for (PutPair pair: pairs) {
             if(!pair.hasKey() || !pair.hasValue())
             {
@@ -593,7 +593,7 @@ public class KVServerTaskHandler implements Runnable {
 
             map.compute(new KeyWrapper(pair.getKey()), (key, value) -> {
                 bytesUsed.addAndGet(pair.getValue().length);
-                return new ValueWrapper(pair.getValue(), pair.getVersion());
+                return new ValueWrapper(pair.getValue(), pair.getVersion(), payload.getPrimaryServer());
             });
 
             mapLock.readLock().unlock();

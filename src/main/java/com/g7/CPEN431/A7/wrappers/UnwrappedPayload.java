@@ -20,6 +20,7 @@ public class UnwrappedPayload implements KVRequest {
     private boolean keyExists = false;
     private boolean valueExists = false;
     private boolean versionExists = false;
+    private ServerEntry primaryServer = null;
 
     public UnwrappedPayload() {
     }
@@ -114,5 +115,13 @@ public class UnwrappedPayload implements KVRequest {
     @Override
     public void setPutPair(List<PutPair> putPair) {
         this.bulkPutPair = putPair;
+    }
+    @Override
+    public ServerEntry getPrimaryServer() {
+        return primaryServer;
+    }
+    @Override
+    public void setPrimaryServer(ServerEntry primaryServer) {
+        this.primaryServer = primaryServer;
     }
 }

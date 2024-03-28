@@ -20,4 +20,6 @@ public interface KVRequest {
     boolean hasPutPair();
     java.util.List<PutPair> getPutPair();
     void setPutPair(java.util.List<PutPair> putPair);
+    ServerEntry getPrimaryServer();
+    void setPrimaryServer(ServerEntry primaryServer);
 }

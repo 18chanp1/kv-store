@@ -22,9 +22,9 @@ public class ServerRecord implements ServerEntry {
     private boolean portExists = false;
     private boolean informationTimeExists = false;
     private boolean updateCodeExists = false;
-    private List<ServerRecord> my_backup_servers;
-    private List<ServerRecord> backup_servers_for;
-    private final static int REPLICATION_FACTOR = 4;
+    private List<ServerRecord> myBackupServers;
+    private List<ServerRecord> backupServersFor;
+    public final static int REPLICATION_FACTOR = 4;
     public final static int CODE_ALI = 0x1;
     public final static int CODE_DED = 0x2;
 
@@ -37,8 +37,8 @@ public class ServerRecord implements ServerEntry {
         this.informationTimeExists = true;
         this.updateCode = 1;
         this.updateCodeExists = true;
-        this.backup_servers_for = new ArrayList<>();
-        this.my_backup_servers = new ArrayList<>();
+        this.myBackupServers = new ArrayList<>();
+        this.backupServersFor = new ArrayList<>();
     }
 
     /* Clone a ServerRecord */
@@ -51,6 +51,8 @@ public class ServerRecord implements ServerEntry {
         this.informationTimeExists = r.informationTimeExists;
         this.updateCode = r.updateCode;
         this.updateCodeExists = r.updateCodeExists;
+        this.myBackupServers = r.myBackupServers;
+        this.backupServersFor = r.backupServersFor;
     }
 
 
@@ -174,16 +176,19 @@ public class ServerRecord implements ServerEntry {
         this.updateCodeExists = true;
     }
     public List<ServerRecord> getMyBackupServers() {
-        return this.my_backup_servers;
+        return this.myBackupServers;
     }
     public void setMyBackupServers(List<ServerRecord> records){
-        this.my_backup_servers = records;
+        this.myBackupServers = records;
     }
     public List<ServerRecord> getBackupServersFor(){
-        return this.backup_servers_for;
+        return this.backupServersFor;
     }
     public void setBackupServersFor(List<ServerRecord> records){
-        this.backup_servers_for = records;
+        this.backupServersFor = records;
+    }
+    public void addBackupServersFor(ServerRecord primary_server){
+        this.backupServersFor.add(primary_server);
     }
     public boolean isAlive()
     {
@@ -191,5 +196,4 @@ public class ServerRecord implements ServerEntry {
     }
 
     public class HashNotGeneratedException extends Exception {}
-
 }
