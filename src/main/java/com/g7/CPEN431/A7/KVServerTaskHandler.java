@@ -93,6 +93,7 @@ public class KVServerTaskHandler implements Runnable {
     public final static int REQ_CODE_PID = 0X07;
     public final static int REQ_CODE_MEM = 0X08;
     public final static int REQ_CODE_DED = 0x100;
+    public final static int REQ_CODE_BKP = 0x101;
 
 
     public final static int STAT_CODE_OK = 0x00;
@@ -333,6 +334,7 @@ public class KVServerTaskHandler implements Runnable {
             case REQ_CODE_MEM: res = handleGetMembershipCount(scaf, payload);  break;
             case REQ_CODE_DED: res = handleDeathUpdate(scaf, payload); break;
             case REQ_CODE_BULKPUT: res = handleBulkPut(scaf, payload); break;
+            case REQ_CODE_BKP: res = handleIsBackup(scaf, payload); break;
 
             default: {
                 RequestCacheValue val = scaf.setResponseType(INVALID_OPCODE).build();
@@ -778,6 +780,7 @@ public class KVServerTaskHandler implements Runnable {
                         List<ServerRecord> serversWeAreBackupFor = us.getBackupServersFor();
                         if (serversWeAreBackupFor.contains(serverRecord)) {
                             processNewlyAlivePrimaryServer(serverRecord);
+
                         }
                     }
                 }
@@ -873,6 +876,19 @@ public class KVServerTaskHandler implements Runnable {
         // send the list of put pairs in our KVStore to the new backup server using bulkPut
         KVClient client = new KVClient(alivePrimaryServer.getAddress(), alivePrimaryServer.getPort(), new DatagramSocket(), new byte[16384]);
         client.bulkPut(putPairsOfNewAliveServer, null);
+        client.isBackup(self);
+    }
+
+    private DatagramPacket handleIsBackup(RequestCacheValue.Builder scaf, UnwrappedPayload payload){
+        if(!payload.hasSender()){
+            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            return generateAndSend(res);
+        }
+        List<ServerRecord> backupServers = self.getMyBackupServers();
+        backupServers.add((ServerRecord) payload.getSender());
+        self.setMyBackupServers(backupServers);
+        RequestCacheValue res = scaf.setResponseType(IS_BACKUP).build();
+        return generateAndSend(res);
     }
 
 

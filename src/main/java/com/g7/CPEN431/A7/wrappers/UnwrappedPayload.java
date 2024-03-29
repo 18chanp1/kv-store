@@ -21,6 +21,7 @@ public class UnwrappedPayload implements KVRequest {
     private boolean valueExists = false;
     private boolean versionExists = false;
     private ServerEntry primaryServer = null;
+    private ServerEntry sender;
 
     public UnwrappedPayload() {
     }
@@ -120,6 +121,19 @@ public class UnwrappedPayload implements KVRequest {
     public ServerEntry getPrimaryServer() {
         return primaryServer;
     }
+
+    public ServerEntry getSender() {
+        return sender;
+    }
+
+    public void setSender(ServerEntry sender) {
+        this.sender = sender;
+    }
+
+    public boolean hasSender(){
+        this.sender != null;
+    }
+
     @Override
     public void setPrimaryServer(ServerEntry primaryServer) {
         this.primaryServer = primaryServer;
