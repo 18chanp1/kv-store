@@ -58,4 +58,12 @@ public class KVPair implements PutPair {
         this.value = value;
     }
 
+    @Override
+    //https://www.geeksforgeeks.org/overriding-equals-method-in-java/
+    public boolean equals (Object o) {
+        if (o == this) return true;
+        if (!(o instanceof PutPair)) return false;
+        PutPair p = (PutPair) o;
+        return p.getKey()==this.getKey() && p.getValue() == this.getValue() && p.getVersion() == this.getVersion();
+    }
 }

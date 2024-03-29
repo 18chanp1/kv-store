@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.zip.CRC32;
 
+import static com.g7.CPEN431.A7.KVServerTaskHandler.REQ_CODE_BKP;
+
 public class KVClient {
     private InetAddress serverAddress;
     private int serverPort;
@@ -279,6 +281,13 @@ public class KVClient {
         return sendAndReceiveServerResponse(pl);
     }
 
+    public ServerResponse isBackup(ServerRecord self) throws MissingValuesException, IOException, ServerTimedOutException, InterruptedException {
+        UnwrappedPayload pl = new UnwrappedPayload();
+        pl.setSender(self);
+        pl.setCommand(REQ_CODE_BKP);
+        return sendAndReceiveServerResponse(pl);
+    }
+
     public ServerResponse isDead(List<ServerEntry> l) throws MissingValuesException, IOException, ServerTimedOutException, InterruptedException {
         UnwrappedPayload pl = new UnwrappedPayload();
         pl.setCommand(REQ_CODE_DED);
@@ -435,7 +444,6 @@ public class KVClient {
             e.printStackTrace();
             return TEST_UNDECIDED;
         }
-
     }
 
     /* Custom exceptions*/
