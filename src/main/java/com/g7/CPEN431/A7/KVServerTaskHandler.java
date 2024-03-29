@@ -157,6 +157,22 @@ public class KVServerTaskHandler implements Runnable {
         this.lastReqTime = new AtomicLong();
     }
 
+    //empty constructor for testing ProcessDeadBackupTest
+    public KVServerTaskHandler(ConcurrentMap<KeyWrapper, ValueWrapper> map, ReadWriteLock mapLock, ConsistentMap serverRing) {
+        this.iPacket = null;
+        this.requestCache = null;
+        this.map = map;
+        this.mapLock = mapLock;
+        this.bytesUsed = null;
+        this.bytePool = null;
+        this.isOverloaded = false;
+        this.outbound = null;
+        this.serverRing = serverRing;
+        this.pendingRecordDeaths = null;
+        this.lastReqTime = new AtomicLong();
+    }
+
+
 
     @Override
     public void run()
@@ -749,58 +765,20 @@ public class KVServerTaskHandler implements Runnable {
                        */
                         List<ServerRecord> myBackupServers = us.getMyBackupServers();
                         if (myBackupServers.contains(serverRecord)) {
-
-                            //remove dead server from primary server's backup list
-                            myBackupServers.remove(serverRecord);
-                            // find new backup server
-                            ServerRecord newBackupServer = serverRing.findBackupServer(myBackupServers);
-
-                            // update primary server's backup list
-                            myBackupServers.add(newBackupServer);
-                            us.setMyBackupServers(myBackupServers);
-
-                            // update serverBackupFor for the new backup server
-                            List<ServerRecord> newServerBackupServerFor = newBackupServer.getBackupServersFor();
-                            newServerBackupServerFor.add(us);
-                            newBackupServer.setBackupServersFor(newServerBackupServerFor);
-
-                            List<PutPair> ourPutPairs = new ArrayList<>();
-
-                            // gather data from our KVStore to transfer to the newly added backup server
-                            assert map != null;
-                            for (Map.Entry<KeyWrapper, ValueWrapper> wrapperEntry: map.entrySet())  {
-                                // check if the KV pair is our (not a backup copy for a different server)
-                                if (wrapperEntry.getValue().getPrimaryServer() == null) {
-                                    PutPair pair = new KVPair(wrapperEntry.getKey().getKey(), wrapperEntry.getValue().getValue(), wrapperEntry.getValue().getVersion());
-                                    ourPutPairs.add(pair);
-                                }
-                            }
-
-                            //change primary server value
+                            ServerRecord newBackupServer = processDeadBackupServer(serverRecord, us);
+                            List<PutPair> ourPutPairs = getOurPutPairs();
+                            // change primary server value
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut
                             KVClient client = new KVClient(newBackupServer.getAddress(), newBackupServer.getPort(), new DatagramSocket(),new byte[16384]);
                             client.bulkPut(ourPutPairs, self);
                         }
                     } else {
                         // news that a server that's not us is alive
-
-                        List<PutPair> putPairsOfNewAliveServer = new ArrayList<>();
                         //check if it is a server that we are a backup for
                         List<ServerRecord> serversWeAreBackupFor = us.getBackupServersFor();
                         if (serversWeAreBackupFor.contains(serverRecord)) {
-
-                            assert map != null;
-                            for (Map.Entry<KeyWrapper, ValueWrapper> wrapperEntry: map.entrySet())  {
-                                if (wrapperEntry.getValue().getPrimaryServer() == server) {
-                                    PutPair pair = new KVPair(wrapperEntry.getKey().getKey(), wrapperEntry.getValue().getValue(), wrapperEntry.getValue().getVersion());
-                                    putPairsOfNewAliveServer.add(pair);
-                                }
-                            }
+                            processNewlyAlivePrimaryServer(serverRecord);
                         }
-
-                        // send the list of put pairs in our KVStore to the new backup server using bulkPut
-                        KVClient client = new KVClient(serverRecord.getAddress(), serverRecord.getPort(), new DatagramSocket(),new byte[16384]);
-                        client.bulkPut(putPairsOfNewAliveServer, null);
                     }
                 }
 
@@ -838,6 +816,65 @@ public class KVServerTaskHandler implements Runnable {
 
         return serverStatusCodes;
     }
+
+    /**
+     * Helper function to handle a dead server that is our backup server.
+     * @param deadServer the dead backup server
+     * @param us current server
+     * @return returns the new backup server
+     */
+    public ServerRecord processDeadBackupServer(ServerRecord deadServer, ServerRecord us) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
+        List<ServerRecord> myBackupServers = us.getMyBackupServers();
+        //remove dead server from primary server's backup list
+        myBackupServers.remove(deadServer);
+        // find new backup server
+        ServerRecord newBackupServer = serverRing.findBackupServer(myBackupServers, us);
+
+        // update primary server's backup list
+        myBackupServers.add(newBackupServer);
+        us.setMyBackupServers(myBackupServers);
+
+        // update serverBackupFor for the new backup server
+        List<ServerRecord> newServerBackupServerFor = newBackupServer.getBackupServersFor();
+        newServerBackupServerFor.add(us);
+        newBackupServer.setBackupServersFor(newServerBackupServerFor);
+
+        return newBackupServer;
+    }
+
+    public List<PutPair> getOurPutPairs(){
+        assert map != null;
+        List<PutPair> ourPutPairs = new ArrayList<>();
+        for (Map.Entry<KeyWrapper, ValueWrapper> wrapperEntry: map.entrySet())  {
+            // check if the KV pair is our (not a backup copy for a different server)
+            if (wrapperEntry.getValue().getPrimaryServer() == null) {
+                PutPair pair = new KVPair(wrapperEntry.getKey().getKey(), wrapperEntry.getValue().getValue(), wrapperEntry.getValue().getVersion());
+                ourPutPairs.add(pair);
+            }
+        }
+        return ourPutPairs;
+    }
+
+    /**
+     * Helper function for handling a server that comes back alive and we are its backup server
+     * @param alivePrimaryServer the server that came back alive
+     */
+    public void processNewlyAlivePrimaryServer(ServerRecord alivePrimaryServer) throws IOException, KVClient.MissingValuesException, KVClient.ServerTimedOutException, InterruptedException {
+        List<PutPair> putPairsOfNewAliveServer = new ArrayList<>();
+
+        assert map != null;
+        for (Map.Entry<KeyWrapper, ValueWrapper> wrapperEntry: map.entrySet())  {
+            if (wrapperEntry.getValue().getPrimaryServer() == alivePrimaryServer) {
+                PutPair pair = new KVPair(wrapperEntry.getKey().getKey(), wrapperEntry.getValue().getValue(), wrapperEntry.getValue().getVersion());
+                putPairsOfNewAliveServer.add(pair);
+            }
+        }
+
+        // send the list of put pairs in our KVStore to the new backup server using bulkPut
+        KVClient client = new KVClient(alivePrimaryServer.getAddress(), alivePrimaryServer.getPort(), new DatagramSocket(), new byte[16384]);
+        client.bulkPut(putPairsOfNewAliveServer, null);
+    }
+
 
     /**
      * Finds keys for which current server is successor and transfers them to the new server

@@ -175,6 +175,7 @@ public class ServerRecord implements ServerEntry {
         this.updateCode = code;
         this.updateCodeExists = true;
     }
+
     public List<ServerRecord> getMyBackupServers() {
         return this.myBackupServers;
     }
