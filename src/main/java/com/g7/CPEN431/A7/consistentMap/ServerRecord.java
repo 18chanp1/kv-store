@@ -181,23 +181,11 @@ public class ServerRecord implements ServerEntry {
     public void setMyBackupServers(List<ServerRecord> records){
         this.myBackupServers = records;
     }
-    public void addMyBackupServers(ServerRecord backupServer){
-        this.myBackupServers.add(backupServer);
-    }
-    public void removeMyBackupServers(ServerRecord backupServer){
-        this.myBackupServers.remove(backupServer);
-    }
     public List<ServerRecord> getBackupServersFor(){
         return this.backupServersFor;
     }
     public void setBackupServersFor(List<ServerRecord> records){
         this.backupServersFor = records;
-    }
-    public void addBackupServersFor(ServerRecord primaryServer){
-        this.backupServersFor.add(primaryServer);
-    }
-    public void removeBackupServersFor(ServerRecord primaryServer){
-        this.backupServersFor.remove(primaryServer);
     }
     public boolean isAlive()
     {

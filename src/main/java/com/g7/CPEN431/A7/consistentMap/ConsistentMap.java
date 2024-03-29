@@ -363,7 +363,10 @@ public class ConsistentMap {
                  * Currently set to REPLICATION_FACTOR
                  */
                 servers.add(server);
-                server.addBackupServersFor(self);
+
+                List<ServerRecord> serverBackupFor = server.getBackupServersFor();
+                serverBackupFor.add(self);
+                server.setBackupServersFor(serverBackupFor);
             }
             self.setMyBackupServers(servers);
         }

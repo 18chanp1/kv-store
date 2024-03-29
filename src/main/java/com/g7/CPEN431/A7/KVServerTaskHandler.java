@@ -749,11 +749,20 @@ public class KVServerTaskHandler implements Runnable {
                        */
                         List<ServerRecord> myBackupServers = us.getMyBackupServers();
                         if (myBackupServers.contains(serverRecord)) {
+
+                            //remove dead server from primary server's backup list
                             myBackupServers.remove(serverRecord);
+                            // find new backup server
                             ServerRecord newBackupServer = serverRing.findBackupServer(myBackupServers);
+
+                            // update primary server's backup list
                             myBackupServers.add(newBackupServer);
                             us.setMyBackupServers(myBackupServers);
-                            newBackupServer.addBackupServersFor(us);
+
+                            // update serverBackupFor for the new backup server
+                            List<ServerRecord> newServerBackupServerFor = newBackupServer.getBackupServersFor();
+                            newServerBackupServerFor.add(us);
+                            newBackupServer.setBackupServersFor(newServerBackupServerFor);
 
                             List<PutPair> ourPutPairs = new ArrayList<>();
 
@@ -765,10 +774,9 @@ public class KVServerTaskHandler implements Runnable {
                                     PutPair pair = new KVPair(wrapperEntry.getKey().getKey(), wrapperEntry.getValue().getValue(), wrapperEntry.getValue().getVersion());
                                     ourPutPairs.add(pair);
                                 }
-
-                                //change primary server value
                             }
 
+                            //change primary server value
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut
                             KVClient client = new KVClient(newBackupServer.getAddress(), newBackupServer.getPort(), new DatagramSocket(),new byte[16384]);
                             client.bulkPut(ourPutPairs, self);
@@ -779,7 +787,7 @@ public class KVServerTaskHandler implements Runnable {
                         List<PutPair> putPairsOfNewAliveServer = new ArrayList<>();
                         //check if it is a server that we are a backup for
                         List<ServerRecord> serversWeAreBackupFor = us.getBackupServersFor();
-                        if (serversWeAreBackupFor.contains((ServerRecord) server)) {
+                        if (serversWeAreBackupFor.contains(serverRecord)) {
 
                             assert map != null;
                             for (Map.Entry<KeyWrapper, ValueWrapper> wrapperEntry: map.entrySet())  {
