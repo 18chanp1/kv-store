@@ -61,8 +61,6 @@ public class KVServer
             self = new ServerRecord(InetAddress.getByAddress(InetAddress.getLocalHost().getAddress()), PORT);
             selfLoopback = new ServerRecord(InetAddress.getLoopbackAddress(), PORT);
 
-
-
             DatagramSocket server = new DatagramSocket(PORT);
             /* Eliminated in single thread */
             ExecutorService executor = Executors.newCachedThreadPool();

@@ -491,7 +491,7 @@ public class KVServerTaskHandler implements Runnable {
      * @param payload Payload from the client
      * @return The packet sent
      */
-    private DatagramPacket handlePut(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
+    private DatagramPacket handlePut(RequestCacheValue.Builder scaf, UnwrappedPayload payload) throws IOException, KVClient.MissingValuesException, KVClient.ServerTimedOutException, InterruptedException {
         if(!payload.hasKey() || !payload.hasValue())
         {
             RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
@@ -535,6 +535,8 @@ public class KVServerTaskHandler implements Runnable {
         });
         mapLock.readLock().unlock();
 
+        updateBackupServers(payload, self.getMyBackupServers());
+
         return pkt.get();
     }
 
@@ -544,17 +546,18 @@ public class KVServerTaskHandler implements Runnable {
      * @param payload Payload from the client
      * @return The packet sent
      */
-    private DatagramPacket handleBulkPut (RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
+    private DatagramPacket handleBulkPut (RequestCacheValue.Builder scaf, UnwrappedPayload payload) throws IOException, KVClient.MissingValuesException, KVClient.ServerTimedOutException, InterruptedException {
         if(!payload.hasPutPair())
         {
             RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
-
-
         bulkPutHelper(payload);
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
+
+        updateBackupServers(payload, self.getMyBackupServers());
+
         return generateAndSend(res);
     }
 
@@ -644,7 +647,7 @@ public class KVServerTaskHandler implements Runnable {
      * @param payload Payload from the client
      * @return The packet sent
      */
-    private DatagramPacket handleDelete(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
+    private DatagramPacket handleDelete(RequestCacheValue.Builder scaf, UnwrappedPayload payload) throws IOException, KVClient.MissingValuesException, KVClient.ServerTimedOutException, InterruptedException {
         if((!payload.hasKey()) || payload.hasValue() || payload.hasVersion())
         {
             RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
@@ -674,6 +677,8 @@ public class KVServerTaskHandler implements Runnable {
         });
         mapLock.readLock().unlock();
 
+        updateBackupServers(payload, self.getMyBackupServers());
+
         return pkt.get();
     }
 
@@ -683,7 +688,7 @@ public class KVServerTaskHandler implements Runnable {
      * @param payload Payload from the client
      * @return The packet sent
      */
-    private DatagramPacket handleWipeout(RequestCacheValue.Builder scaf, UnwrappedPayload payload){
+    private DatagramPacket handleWipeout(RequestCacheValue.Builder scaf, UnwrappedPayload payload) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
         if(payload.hasValue() || payload.hasVersion() || payload.hasKey())
         {
             RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
@@ -698,6 +703,8 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue res = scaf.setResponseType(WIPEOUT).build();
         DatagramPacket pkt = generateAndSend(res);
         mapLock.writeLock().unlock();
+
+        updateBackupServers(payload, self.getMyBackupServers());
 
         System.gc();
 
@@ -837,6 +844,34 @@ public class KVServerTaskHandler implements Runnable {
         }
 
         return serverStatusCodes;
+    }
+
+    /**
+     * This function should be called upon receiving a write operation. It updates the backup
+     * servers with the change detailed in the payload. For non-write operations (e.g. GET), does nothing.
+     * @param payload The payload with the write operation (PUT, WIPEOUT, DELETE, BULKPUT)
+     * @param backupServers The list of backup servers to update
+     */
+    private void updateBackupServers(UnwrappedPayload payload, List<ServerRecord> backupServers) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
+        for (ServerRecord backup : backupServers) {
+            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+
+            switch(payload.getCommand())
+            {
+                case REQ_CODE_PUT:
+                    client.put(payload.getKey(), payload.getValue(), payload.getVersion()); break;
+                case REQ_CODE_DEL:
+                    client.delete(payload.getKey()); break;
+                case REQ_CODE_WIP:
+                    client.wipeout();  break;
+                case REQ_CODE_BULKPUT:
+                    client.bulkPut(payload.getPutPair(), backup); break;
+
+                default: {
+                    System.out.println("Req code " + payload.getCommand() + " received, doesn't require updating backups");
+                }
+            }
+        }
     }
 
     /**

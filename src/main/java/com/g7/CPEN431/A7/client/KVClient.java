@@ -192,7 +192,7 @@ public class KVClient {
 
         sendAndReceiveServerResponse(pl);
     }
-    private ServerResponse wipeout() throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse wipeout() throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         /* Generate isAlive Message */
         UnwrappedPayload pl = new UnwrappedPayload();
         pl.setCommand(REQ_CODE_WIP);
@@ -200,7 +200,7 @@ public class KVClient {
 
         return sendAndReceiveServerResponse(pl);
     }
-    private ServerResponse delete(byte[] key) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse delete(byte[] key) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         /* Generate isAlive Message */
         UnwrappedPayload pl = new UnwrappedPayload();
         pl.setCommand(REQ_CODE_DEL);
@@ -237,7 +237,7 @@ public class KVClient {
         return sendAndReceiveServerResponse(pl);
     }
 
-    private ServerResponse put(byte[] key, byte[] value, int version) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse put(byte[] key, byte[] value, int version) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         /* Generate isAlive Message */
         UnwrappedPayload pl = new UnwrappedPayload();
         pl.setCommand(REQ_CODE_PUT);
