@@ -7,7 +7,7 @@ import com.g7.CPEN431.A7.newProto.KVRequest.ServerEntry;
 import java.util.List;
 
 /**
- * A class than encapsulates the payload of an incoming requrest. Self Explanatory.
+ * A class than encapsulates the payload of an incoming request. Self Explanatory.
  */
 public class UnwrappedPayload implements KVRequest {
     private int command;
@@ -131,7 +131,7 @@ public class UnwrappedPayload implements KVRequest {
     }
 
     public boolean hasSender(){
-        this.sender != null;
+        return this.sender != null;
     }
 
     @Override
