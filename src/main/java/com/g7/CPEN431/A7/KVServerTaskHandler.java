@@ -553,7 +553,10 @@ public class KVServerTaskHandler implements Runnable {
         });
         mapLock.readLock().unlock();
 
-        updateBackupServers(payload, self.getMyBackupServers());
+        for (ServerRecord backup : self.getMyBackupServers()) {
+            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+            updateBackupServer(payload, client, null);
+        }
 
         return pkt.get();
     }
@@ -574,7 +577,10 @@ public class KVServerTaskHandler implements Runnable {
         bulkPutHelper(payload);
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
 
-        updateBackupServers(payload, self.getMyBackupServers());
+        for (ServerRecord backup : self.getMyBackupServers()) {
+            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+            updateBackupServer(payload, client, null);
+        }
 
         return generateAndSend(res);
     }
@@ -695,7 +701,10 @@ public class KVServerTaskHandler implements Runnable {
         });
         mapLock.readLock().unlock();
 
-        updateBackupServers(payload, self.getMyBackupServers());
+        for (ServerRecord backup : self.getMyBackupServers()) {
+            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+            updateBackupServer(payload, client, null);
+        }
 
         return pkt.get();
     }
@@ -722,7 +731,10 @@ public class KVServerTaskHandler implements Runnable {
         DatagramPacket pkt = generateAndSend(res);
         mapLock.writeLock().unlock();
 
-        updateBackupServers(payload, self.getMyBackupServers());
+        for (ServerRecord backup : self.getMyBackupServers()) {
+            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+            updateBackupServer(payload, client, null);
+        }
 
         System.gc();
 
@@ -839,14 +851,13 @@ public class KVServerTaskHandler implements Runnable {
 
     /**
      * This function should be called upon receiving a write operation. It updates the backup
-     * servers with the change detailed in the payload. For non-write operations (e.g. GET), does nothing.
+     * servers by using the client to send the change detailed in the payload.
+     * For non-write operations (e.g. GET), does nothing.
      * @param payload The payload with the write operation (PUT, WIPEOUT, DELETE, BULKPUT)
-     * @param backupServers The list of backup servers to update
+     * @param client The client to send the payload message to
+     * @param primaryServer Optional. For bulk put operation
      */
-    private void updateBackupServers(UnwrappedPayload payload, List<ServerRecord> backupServers) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
-        for (ServerRecord backup : backupServers) {
-            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
-
+    public void updateBackupServer(UnwrappedPayload payload, KVClient client, ServerRecord primaryServer) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
             switch(payload.getCommand())
             {
                 case REQ_CODE_PUT:
@@ -856,13 +867,12 @@ public class KVServerTaskHandler implements Runnable {
                 case REQ_CODE_WIP:
                     client.wipeout();  break;
                 case REQ_CODE_BULKPUT:
-                    client.bulkPut(payload.getPutPair(), backup); break;
+                    client.bulkPut(payload.getPutPair(), primaryServer); break;
 
                 default: {
                     System.out.println("Req code " + payload.getCommand() + " received, doesn't require updating backups");
                 }
             }
-        }
     }
 
     /**
