@@ -228,6 +228,16 @@ public class ConsistentMap {
         return updated;
     }
 
+    // helper function to test ProcessDeadBackupTest
+    public void removeServer(ServerRecord deadServer) {
+
+        for(int i = 0; i < VNodes; i++)
+        {
+            VNode v = new VNode(deadServer, i);
+            ring.remove(v.getHash());
+        }
+    }
+
     /**
      * Helper function to hash any byte array to int
      * @param key The byte array
@@ -390,7 +400,7 @@ public class ConsistentMap {
     /**
      * A virtual node representing a physical server
      */
-    static class VNode {
+    public static class VNode {
         private ServerRecord serverRecord;
         private int vnodeID;
         private int hash;

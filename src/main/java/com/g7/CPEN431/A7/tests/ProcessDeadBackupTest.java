@@ -60,6 +60,9 @@ public class ProcessDeadBackupTest {
         List<ServerRecord> initialBackupServers = self.getMyBackupServers();
         ServerRecord deadServer = initialBackupServers.get(0);
 
+        //remove dead server from ring
+        ring.removeServer(deadServer);
+
         assertEquals(initialBackupServers.size(), REPLICATION_FACTOR-1);
 
         for (int i = 0; i < initialBackupServers.size(); i++) {

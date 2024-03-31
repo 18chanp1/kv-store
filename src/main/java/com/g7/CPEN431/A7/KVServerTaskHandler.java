@@ -774,11 +774,16 @@ public class KVServerTaskHandler implements Runnable {
                        */
                         List<ServerRecord> myBackupServers = us.getMyBackupServers();
                         if (myBackupServers.contains(serverRecord)) {
+                            // get a new backup server and handle backup lists
                             ServerRecord newBackupServer = processDeadBackupServer(serverRecord, us);
+
+                            //get our put-pairs to send to the new backup server
                             List<PutPair> ourPutPairs = getOurPutPairs();
-                            // change primary server value
+
+
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut
                             KVClient client = new KVClient(newBackupServer.getAddress(), newBackupServer.getPort(), new DatagramSocket(),new byte[16384]);
+                            // change primary server value
                             client.bulkPut(ourPutPairs, self);
                         }
                     } else {
@@ -786,8 +791,13 @@ public class KVServerTaskHandler implements Runnable {
                         //check if it is a server that we are a backup for
                         List<ServerRecord> serversWeAreBackupFor = us.getBackupServersFor();
                         if (serversWeAreBackupFor.contains(serverRecord)) {
-                            processNewlyAlivePrimaryServer(serverRecord);
+                            // get the primary server's put pairs to send back
+                            List<PutPair> putPairsOfNewAliveServer = getPutPairsOfPrimaryServer(serverRecord);
 
+                            // send the list of put pairs in our KVStore to the new backup server using bulkPut, and declare that we are one of their backup servers
+                            KVClient client = new KVClient(serverRecord.getAddress(), serverRecord.getPort(), new DatagramSocket(), new byte[16384]);
+                            client.bulkPut(putPairsOfNewAliveServer, null);
+                            client.isBackup(self);
                         }
                     }
                 }
@@ -880,6 +890,10 @@ public class KVServerTaskHandler implements Runnable {
         return newBackupServer;
     }
 
+    /**
+     * put pairs in our KVstore that are we are the primary server of
+     * @return list of pairs
+     */
     public List<PutPair> getOurPutPairs(){
         assert map != null;
         List<PutPair> ourPutPairs = new ArrayList<>();
@@ -896,8 +910,9 @@ public class KVServerTaskHandler implements Runnable {
     /**
      * Helper function for handling a server that comes back alive and we are its backup server
      * @param alivePrimaryServer the server that came back alive
+     * @return list of pairs
      */
-    public void processNewlyAlivePrimaryServer(ServerRecord alivePrimaryServer) throws IOException, KVClient.MissingValuesException, KVClient.ServerTimedOutException, InterruptedException {
+    public List<PutPair> getPutPairsOfPrimaryServer(ServerRecord alivePrimaryServer) throws IOException, KVClient.MissingValuesException, KVClient.ServerTimedOutException, InterruptedException {
         List<PutPair> putPairsOfNewAliveServer = new ArrayList<>();
 
         assert map != null;
@@ -908,10 +923,7 @@ public class KVServerTaskHandler implements Runnable {
             }
         }
 
-        // send the list of put pairs in our KVStore to the new backup server using bulkPut
-        KVClient client = new KVClient(alivePrimaryServer.getAddress(), alivePrimaryServer.getPort(), new DatagramSocket(), new byte[16384]);
-        client.bulkPut(putPairsOfNewAliveServer, null);
-        client.isBackup(self);
+        return putPairsOfNewAliveServer;
     }
 
     private DatagramPacket handleIsBackup(RequestCacheValue.Builder scaf, UnwrappedPayload payload){
