@@ -13,9 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.self;
@@ -125,6 +123,81 @@ public class ConsistentMap {
     }
 
     /**
+     * Lock MUST be obtained prior to calling this function. Additionally,
+     * the ring must be checked beforehand to ensure there are sufficient amount
+     * of vnodes to return the actual value.
+     * @param hashcode - hashcode
+     * @return Actual serverRecord corresponding to the code
+     */
+    private ServerRecord getServerWithHashcode(int hashcode)
+    {
+        lock.readLock().lock();
+        Map.Entry<Integer, VNode> server = ring.ceilingEntry(hashcode);
+        /* Deal with case where the successor of the key is past "0" */
+        server = (server == null) ? ring.firstEntry(): server;
+        lock.readLock().unlock();
+
+        return server.getValue().serverRecord;
+    }
+
+    public List<ServerRecord> getNReplicas(byte[] key, int n)
+    {
+        lock.readLock().lock();
+        if(ring.size() < n * VNodes)
+        {
+            lock.readLock().unlock();
+            System.err.println("Insufficient servers in ring for replica");
+            throw new NoServersException();
+        }
+
+        List<ServerRecord> result = new ArrayList<>();
+        int hashcode = getHash(key);
+        Map.Entry<Integer, VNode> serverEntry = ring.ceilingEntry(hashcode);
+        /* Deal with case where the successor of the key is past "0" */
+        serverEntry = (serverEntry == null) ? ring.firstEntry(): serverEntry;
+
+        ServerRecord firstServer = serverEntry.getValue().serverRecord;
+
+        //add main's clone
+        int serverCode = firstServer.getCode();
+        result.add(new ServerRecord(firstServer));
+
+        //prepare code to get next entry
+        serverCode++;
+
+        //add replicas
+        for(int i = 1; i < n; i++)
+        {
+            ServerRecord curr;
+            do
+            {
+                curr = getServerWithHashcode(serverCode);
+                serverCode = curr.getCode() + 1;
+            } while(result.contains(curr));
+
+            //curr is now the subsequent replica
+            result.add(new ServerRecord(curr));
+        }
+
+        lock.readLock().unlock();
+        return result;
+    }
+
+    public REPLICA_TYPE isReplica(byte[] key, int n_replica)
+    {
+        List<ServerRecord> replicas = getNReplicas(key, n_replica);
+
+        for(int i = 0; i < n_replica; i++)
+        {
+            if(replicas.get(i).equals(self) || replicas.get(i).equals(selfLoopback))
+            {
+                return i == 0 ? REPLICA_TYPE.PRIMARY : REPLICA_TYPE.BACKUP;
+            }
+        }
+        return REPLICA_TYPE.UNRELATED;
+    }
+
+    /**
      *
      * @return A random server in the ring.
      * @throws NoServersException - If there are no servers
@@ -205,6 +278,7 @@ public class ConsistentMap {
                     VNode v = new VNode(actualRecord, i);
                     ring.remove(v.getHash());
                 }
+                updated = true;
             }
             // resurrection
             else if (!actualRecord.isAlive() && r.isAlive())
@@ -214,6 +288,7 @@ public class ConsistentMap {
                     VNode v = new VNode(actualRecord, i);
                     ring.put(v.getHash(), v);
                 }
+                updated = true;
             }
             //otherwise, it must be in the same state, thus ring does not need to be changed.
 
@@ -221,7 +296,6 @@ public class ConsistentMap {
             actualRecord.setCode(r.getCode());
             actualRecord.setInformationTime(r.getInformationTime());
 
-            updated = true;
             System.out.println(getServerCount());
         }
         lock.writeLock().unlock();
@@ -475,7 +549,14 @@ public class ConsistentMap {
             );
         }
 
-}
+    }
+
+    static enum REPLICA_TYPE
+    {
+        PRIMARY,
+        BACKUP,
+        UNRELATED
+    }
 
 }
 

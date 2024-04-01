@@ -33,7 +33,8 @@ public class KVClient {
     int testSequence;
     UnwrappedMessage messageOnWire;
 
-    public final static int timeout = 300;
+    private final int timeout = 300;
+    private int triesMax = 4;
 
     /* Test Result codes */
     public final static int TEST_FAILED = 0;
@@ -366,18 +367,18 @@ public class KVClient {
 
     ServerResponse sendAndReceiveSingleServerResponse(UnwrappedMessage req) throws ServerTimedOutException, IOException {
         DatagramPacket rP = new DatagramPacket(publicBuf, publicBuf.length);
+        int initTimeout = socket.getSoTimeout();
+
 
         int tries = 0;
         boolean success = false;
-
         byte[] msgb = KVMsgSerializer.serialize(req);
         DatagramPacket p = new DatagramPacket(msgb, msgb.length, serverAddress, serverPort);
-        int initTimeout = socket.getSoTimeout();
 
         messageOnWire = req;
 
         UnwrappedMessage res = null;
-        while (tries < 4 && !success)
+        while (tries < triesMax && !success)
         {
             socket.send(p);
             try {
@@ -415,7 +416,7 @@ public class KVClient {
 
         socket.setSoTimeout(initTimeout);
 
-        if(tries == 4 && !success) {
+        if(tries == triesMax && !success) {
             throw new ServerTimedOutException();
         }
 
