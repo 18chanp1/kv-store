@@ -24,6 +24,11 @@ public class ForwardList {
         keyEntries.add(new KVPair(entry.getKey().getKey(), entry.getValue().getValue(), entry.getValue().getVersion()));
     }
 
+    public void addToList(KVPair pair)
+    {
+        keyEntries.add(pair);
+    }
+
     public ServerRecord getDestination() {
         return destination;
     }

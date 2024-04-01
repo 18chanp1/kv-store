@@ -49,6 +49,7 @@ public class KVClient {
     public final static int REQ_CODE_MEM = 0X08;
     public final static int REQ_CODE_DED = 0x100;
     public final static int REQ_CODE_BULKPUT = 0x200;
+    public final static int REQ_CODE_BULKPUT_FIN = 0x201;
 
     public final static int RES_CODE_SUCCESS = 0x0;
     public final static int RES_CODE_NO_KEY = 0x1;
@@ -235,6 +236,15 @@ public class KVClient {
         pl.setPutPair(pairs);
         return sendAndReceiveServerResponse(pl);
     }
+
+    public ServerResponse bulkPutDone(List<PutPair> pairs) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+        UnwrappedPayload pl = new UnwrappedPayload();
+        assert pairs != null;
+        pl.setCommand(REQ_CODE_BULKPUT_FIN);
+        pl.setPutPair(pairs);
+        return sendAndReceiveServerResponse(pl);
+    }
+
 
     private ServerResponse put(byte[] key, byte[] value, int version) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         /* Generate isAlive Message */

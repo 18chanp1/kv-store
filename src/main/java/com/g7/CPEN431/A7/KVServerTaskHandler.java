@@ -2,9 +2,7 @@ package com.g7.CPEN431.A7;
 
 import com.g7.CPEN431.A7.cache.RequestCacheKey;
 import com.g7.CPEN431.A7.cache.RequestCacheValue;
-import com.g7.CPEN431.A7.cache.ResponseType;
 import com.g7.CPEN431.A7.client.KVClient;
-import com.g7.CPEN431.A7.client.ServerResponse;
 import com.g7.CPEN431.A7.consistentMap.ConsistentMap;
 import com.g7.CPEN431.A7.consistentMap.ForwardList;
 import com.g7.CPEN431.A7.consistentMap.ServerRecord;
@@ -22,14 +20,12 @@ import com.google.common.cache.Cache;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.*;
-import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,12 +33,12 @@ import java.util.concurrent.locks.ReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.*;
 import static com.g7.CPEN431.A7.cache.ResponseType.*;
-import static com.g7.CPEN431.A7.consistentMap.ServerRecord.CODE_ALI;
 import static com.g7.CPEN431.A7.consistentMap.ServerRecord.CODE_DED;
 
 public class KVServerTaskHandler implements Runnable {
     /* Thread parameters */
     private final AtomicLong lastReqTime;
+    private final AtomicBoolean waitingForReplicaTransfer;
     private final AtomicInteger bytesUsed;
     private final DatagramPacket iPacket;
     private final Cache<RequestCacheKey, DatagramPacket> requestCache;
@@ -64,13 +60,14 @@ public class KVServerTaskHandler implements Runnable {
     final private boolean isOverloaded;
     final private ConcurrentLinkedQueue<DatagramPacket> outbound;
     final private ConcurrentLinkedQueue<ServerRecord>pendingRecordDeaths;
+    final private ConcurrentLinkedQueue<KVClient> clientPool;
     //do not use
     ExecutorService threadPool;
 
     /* Constants */
     public final static int KEY_MAX_LEN = 32;
     public final static int VALUE_MAX_LEN = 10_000;
-    public final static int CACHE_OVL_WAIT_TIME = 80;   // Temporarily unused since cache doesn't overflow
+    public final static int CACHE_OVL_WAIT_TIME = 1000;   // Temporarily unused since cache doesn't overflow
     public final static int THREAD_OVL_WAIT_TIME = 80;
 
     /* Response Codes */
@@ -89,6 +86,7 @@ public class KVServerTaskHandler implements Runnable {
     public final static int REQ_CODE_PUT = 0x01;
 
     public final static int REQ_CODE_BULKPUT = 0x200;
+    public final static int REQ_CODE_BULKPUT_FIN = 0x201;
     public final static int REQ_CODE_GET = 0X02;
     public final static int REQ_CODE_DEL = 0X03;
     public final static int REQ_CODE_SHU = 0X04;
@@ -115,7 +113,9 @@ public class KVServerTaskHandler implements Runnable {
                                ConsistentMap serverRing,
                                ConcurrentLinkedQueue<ServerRecord> pendingRecordDeaths,
                                ExecutorService threadPool,
-                               AtomicLong lastReqTime) {
+                               AtomicLong lastReqTime,
+                               ConcurrentLinkedQueue<KVClient> clientPool,
+                               AtomicBoolean waitingForReplicaTransfer) {
         this.iPacket = iPacket;
         this.requestCache = requestCache;
         this.map = map;
@@ -128,6 +128,8 @@ public class KVServerTaskHandler implements Runnable {
         this.pendingRecordDeaths = pendingRecordDeaths;
         this.threadPool = threadPool;
         this.lastReqTime = lastReqTime;
+        this.clientPool = clientPool;
+        this.waitingForReplicaTransfer = waitingForReplicaTransfer;
 
     }
 
@@ -144,6 +146,8 @@ public class KVServerTaskHandler implements Runnable {
         this.serverRing = serverRing;
         this.pendingRecordDeaths = pendingRecordDeaths;
         this.lastReqTime = new AtomicLong();
+        this.clientPool = new ConcurrentLinkedQueue<>();
+        this.waitingForReplicaTransfer = new AtomicBoolean();
     }
 
     // empty constructor for testing BulkPutTest
@@ -159,6 +163,8 @@ public class KVServerTaskHandler implements Runnable {
         this.serverRing = null;
         this.pendingRecordDeaths = null;
         this.lastReqTime = new AtomicLong();
+        this.clientPool = new ConcurrentLinkedQueue<>();
+        this.waitingForReplicaTransfer = new AtomicBoolean();
     }
 
 
@@ -223,17 +229,31 @@ public class KVServerTaskHandler implements Runnable {
             if(payload.hasKey())
             {
                 byte[] key = payload.getKey();
-                ServerRecord destination = serverRing.getServer(key);
+                List<ServerRecord> destinations = serverRing.getNReplicas(key);
+                ConsistentMap.REPLICA_TYPE req_type = serverRing.isReplica(destinations);
 
-                if((!destination.equals(self)) && (!destination.equals(selfLoopback)))
+                //forward to random replica for get commands that are unrelated
+                if(req_type == ConsistentMap.REPLICA_TYPE.UNRELATED && payload.getCommand() == REQ_CODE_GET)
                 {
-                    // Set source so packet will be sent to correct sender.
+                    int selectedReplica = new Random().nextInt(N_REPLICAS);
                     unwrappedMessage.setSourceAddress(iPacket.getAddress());
                     unwrappedMessage.setSourcePort(iPacket.getPort());
-                    DatagramPacket p = unwrappedMessage.generatePacket(destination);
+//                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(selectedReplica));
+                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(0));
                     sendResponse(p);
                     return;
                 }
+                //forward to main, for all writes that I am not primary
+                else if(req_type != ConsistentMap.REPLICA_TYPE.PRIMARY && payload.getCommand() == REQ_CODE_PUT)
+                {
+                    unwrappedMessage.setSourceAddress(iPacket.getAddress());
+                    unwrappedMessage.setSourcePort(iPacket.getPort());
+                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(0));
+                    sendResponse(p);
+                    return;
+                }
+                //handle myself. (primary, replica + read)
+
             }
         } catch (ConsistentMap.NoServersException e) {
             System.err.println("There are no servers in the server ring");
@@ -321,6 +341,7 @@ public class KVServerTaskHandler implements Runnable {
             case REQ_CODE_MEM: res = handleGetMembershipCount(scaf, payload);  break;
             case REQ_CODE_DED: res = handleDeathUpdate(scaf, payload); break;
             case REQ_CODE_BULKPUT: res = handleBulkPut(scaf, payload); break;
+            case REQ_CODE_BULKPUT_FIN: res = handleBulkPutFin(scaf, payload); break;
 
             default: {
                 RequestCacheValue val = scaf.setResponseType(INVALID_OPCODE).build();
@@ -515,6 +536,13 @@ public class KVServerTaskHandler implements Runnable {
             return generateAndSend(res);
         }
 
+        //block key gets until main is updated
+//        if(waitingForReplicaTransfer.get())
+//        {
+//            RequestCacheValue res = scaf.setResponseType(OVERLOAD_CACHE).build();
+//            return generateAndSend(res);
+//        }
+
 
         if(bytesUsed.get() >= MAP_SZ) {
             RequestCacheValue res = scaf.setResponseType(NO_MEM).build();
@@ -532,10 +560,62 @@ public class KVServerTaskHandler implements Runnable {
         AtomicReference<IOException> ioexception= new AtomicReference<>();
         AtomicReference<DatagramPacket> pkt = new AtomicReference<>();
         map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
+            //prepare Value
+            ValueWrapper val = new ValueWrapper(payload.getValue(), payload.getVersion());
+
+
+            //forward this to backups
+            List<ServerRecord> replicas = serverRing.getNReplicas(payload.getKey());
+            //remove myself
+            replicas.remove(0);
+            KVPair pair = new KVPair(payload.getKey(), payload.getValue(), payload.getVersion());
+            ExecutorCompletionService<List<RawPutHandler.STATUS>> ecs = new ExecutorCompletionService<>(threadPool);
+            List<KVClient> borrowed = new ArrayList<>();
+            for(ServerRecord server : replicas)
+            {
+                ForwardList fl = new ForwardList(server);
+                fl.addToList(pair);
+                KVClient cl;
+                while((cl = clientPool.poll()) == null) Thread.yield();
+                ecs.submit(new RawPutHandler(fl, cl));
+                borrowed.add(cl);
+            }
+
+            for(int i = 0; i < N_REPLICAS - 1; i++)
+            {
+                Future<List<RawPutHandler.STATUS>> result = ecs.poll();
+                List<RawPutHandler.STATUS> statuses;
+                try {
+                    statuses = result.get();
+                } catch (Exception e) {
+                    mapLock.readLock().unlock();
+                    System.err.println("Exception while sending!");
+                    throw new RuntimeException(e);
+                }
+
+                for(RawPutHandler.STATUS status : statuses)
+                {
+                    //return internal error
+                    if(status != RawPutHandler.STATUS.OK)
+                    {
+                        //todo fix this later
+                        System.err.println("failed to reach successors");
+                        RequestCacheValue res = scaf.setResponseType(NO_MEM).build();
+                        pkt.set(generateAndSend(res));
+                        bytesUsed.addAndGet(payload.getValue().length);
+                        return val;
+                    }
+                }
+            }
+
+            clientPool.addAll(borrowed);
+            System.out.println("put done. ");
+
+
             RequestCacheValue res = scaf.setResponseType(PUT).build();
             pkt.set(generateAndSend(res));
             bytesUsed.addAndGet(payload.getValue().length);
-            return new ValueWrapper(payload.getValue(), payload.getVersion());
+            return val;
         });
         mapLock.readLock().unlock();
 
@@ -558,6 +638,20 @@ public class KVServerTaskHandler implements Runnable {
 
 
         bulkPutHelper(payload.getPutPair());
+        RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
+        return generateAndSend(res);
+    }
+
+    private DatagramPacket handleBulkPutFin (RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
+        if(!payload.hasPutPair())
+        {
+            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            return generateAndSend(res);
+        }
+
+
+        bulkPutHelper(payload.getPutPair());
+        waitingForReplicaTransfer.set(false);
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
         return generateAndSend(res);
     }

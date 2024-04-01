@@ -1,6 +1,7 @@
 package com.g7.CPEN431.A7;
 
 import com.g7.CPEN431.A7.cache.RequestCacheKey;
+import com.g7.CPEN431.A7.client.KVClient;
 import com.g7.CPEN431.A7.consistentMap.ConsistentMap;
 import com.g7.CPEN431.A7.consistentMap.ServerRecord;
 import com.g7.CPEN431.A7.map.KeyWrapper;
@@ -17,6 +18,7 @@ import java.net.SocketException;
 import java.time.Instant;
 import java.util.Timer;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -41,8 +43,10 @@ public class KVServer
     final static int GOSSIP_INTERVAL = 400;
     final static int GOSSIP_WAIT_INIT = 15_000;
     public final static int BULKPUT_MAX_SZ = 12000;
+    public final static int N_REPLICAS = 1;
     public static ServerRecord self;
     public static ServerRecord selfLoopback;
+
 
 
     public static void main( String[] args )
@@ -104,6 +108,13 @@ public class KVServer
                 bytePool.add(new byte[PACKET_MAX]);
             }
 
+            /* Setup pool of clients */
+            ConcurrentLinkedQueue<KVClient> clientPool = new ConcurrentLinkedQueue<>();
+            for(int i = 0; i < N_THREADS * N_REPLICAS; i++)
+            {
+                clientPool.add(new KVClient(new byte[PACKET_MAX]));
+            }
+
             /* Outbound Queue and Thread - eliminated in single thread implementation */
             ConcurrentLinkedQueue<DatagramPacket> outbound = new ConcurrentLinkedQueue<>();
             executor.execute(() -> {
@@ -122,7 +133,7 @@ public class KVServer
             });
 
             /* Set up the list of servers */
-            ConsistentMap serverRing = new ConsistentMap(VNODE_COUNT, SERVER_LIST);
+            ConsistentMap serverRing = new ConsistentMap(VNODE_COUNT, N_REPLICAS, SERVER_LIST);
 
             /* Set up obituary list */
             ConcurrentLinkedQueue<ServerRecord> pendingRecordDeaths = new ConcurrentLinkedQueue();
@@ -130,9 +141,12 @@ public class KVServer
             /* Set up last update time */
             AtomicLong lastReqTime = new AtomicLong(Instant.now().toEpochMilli() + GOSSIP_WAIT_INIT + GOSSIP_INTERVAL);
 
+            //setup the blocking that waits for incoming transfers
+            AtomicBoolean waitingForIncomingTransfer = new AtomicBoolean(false);
+
             /* set up the timer */
             Timer timer = new Timer();
-            timer.schedule(new DeathRegistrar(pendingRecordDeaths, serverRing, lastReqTime), GOSSIP_WAIT_INIT, GOSSIP_INTERVAL);
+            timer.schedule(new DeathRegistrar(pendingRecordDeaths, serverRing, lastReqTime, waitingForIncomingTransfer), GOSSIP_WAIT_INIT, GOSSIP_INTERVAL);
 
 
             while(true){
@@ -160,7 +174,9 @@ public class KVServer
                         serverRing,
                         pendingRecordDeaths,
                         executor,
-                        lastReqTime));
+                        lastReqTime,
+                        clientPool,
+                        waitingForIncomingTransfer));
 
                 /* Executed here in single thread impl. */
 //                while(!outbound.isEmpty())
