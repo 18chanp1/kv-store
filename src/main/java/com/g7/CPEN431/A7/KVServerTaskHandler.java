@@ -238,13 +238,13 @@ public class KVServerTaskHandler implements Runnable {
                     int selectedReplica = new Random().nextInt(N_REPLICAS);
                     unwrappedMessage.setSourceAddress(iPacket.getAddress());
                     unwrappedMessage.setSourcePort(iPacket.getPort());
-//                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(selectedReplica));
-                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(0));
+                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(selectedReplica));
+//                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(0));
                     sendResponse(p);
                     return;
                 }
                 //forward to main, for all writes that I am not primary
-                else if(req_type != ConsistentMap.REPLICA_TYPE.PRIMARY && payload.getCommand() == REQ_CODE_PUT)
+                else if((payload.getCommand() == REQ_CODE_PUT || payload.getCommand() == REQ_CODE_DEL) && req_type != ConsistentMap.REPLICA_TYPE.PRIMARY)
                 {
                     unwrappedMessage.setSourceAddress(iPacket.getAddress());
                     unwrappedMessage.setSourcePort(iPacket.getPort());
@@ -583,13 +583,15 @@ public class KVServerTaskHandler implements Runnable {
 
             for(int i = 0; i < N_REPLICAS - 1; i++)
             {
-                Future<List<RawPutHandler.STATUS>> result = ecs.poll();
+                Future<List<RawPutHandler.STATUS>> result;
                 List<RawPutHandler.STATUS> statuses;
                 try {
+                    result = ecs.take();
                     statuses = result.get();
                 } catch (Exception e) {
                     mapLock.readLock().unlock();
                     System.err.println("Exception while sending!");
+                    clientPool.addAll(borrowed);
                     throw new RuntimeException(e);
                 }
 
@@ -635,7 +637,7 @@ public class KVServerTaskHandler implements Runnable {
             return generateAndSend(res);
         }
 
-
+        System.out.println("received bulkput");
 
         bulkPutHelper(payload.getPutPair());
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
@@ -649,7 +651,7 @@ public class KVServerTaskHandler implements Runnable {
             return generateAndSend(res);
         }
 
-
+        System.out.println("last bulkput rcvd");
         bulkPutHelper(payload.getPutPair());
         waitingForReplicaTransfer.set(false);
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();

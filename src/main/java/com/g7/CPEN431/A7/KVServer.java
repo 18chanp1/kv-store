@@ -43,7 +43,7 @@ public class KVServer
     final static int GOSSIP_INTERVAL = 400;
     final static int GOSSIP_WAIT_INIT = 15_000;
     public final static int BULKPUT_MAX_SZ = 12000;
-    public final static int N_REPLICAS = 1;
+    public final static int N_REPLICAS = 2;
     public static ServerRecord self;
     public static ServerRecord selfLoopback;
 

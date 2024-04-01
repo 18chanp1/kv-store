@@ -428,10 +428,8 @@ public class ConsistentMap {
             throw new NoServersException();
         }
 
-        //calculate diff of successor list, so keys are only sent to "new" successors.
         Map<ServerRecord, ForwardList> m = new HashMap<>();
         Set<ServerRecord> diff = getCurrentSuccessors();
-        diff.removeAll(successors);
 
         entries.forEach((entry) ->
         {
@@ -454,7 +452,7 @@ public class ConsistentMap {
                         if(v == null) forwardList = new ForwardList(clone);
                         else forwardList = v;
 
-                        forwardList.addToList(entry);
+                        forwardList.addToList(entry, false);
 
                         return forwardList;
                     });
@@ -469,7 +467,7 @@ public class ConsistentMap {
                     if(v == null) forwardList = new ForwardList(prim);
                     else forwardList = v;
 
-                    forwardList.addToList(entry);
+                    forwardList.addToList(entry, true);
 
                     return forwardList;
                 });

@@ -12,16 +12,16 @@ import java.util.Map;
 
 public class ForwardList {
     ServerRecord destination;
-    Collection<PutPair> keyEntries;
+    Collection<KVPair> keyEntries;
 
     public ForwardList(ServerRecord destination) {
         this.destination = destination;
         this.keyEntries = new ArrayList<>();
     }
 
-    public void addToList(Map.Entry<KeyWrapper, ValueWrapper> entry)
+    public void addToList(Map.Entry<KeyWrapper, ValueWrapper> entry, boolean delete)
     {
-        keyEntries.add(new KVPair(entry.getKey().getKey(), entry.getValue().getValue(), entry.getValue().getVersion()));
+        keyEntries.add(new KVPair(entry.getKey().getKey(), entry.getValue().getValue(), entry.getValue().getVersion(), delete));
     }
 
     public void addToList(KVPair pair)
@@ -33,7 +33,7 @@ public class ForwardList {
         return destination;
     }
 
-    public Collection<PutPair> getKeyEntries() {
+    public Collection<KVPair> getKeyEntries() {
         return keyEntries;
     }
 }

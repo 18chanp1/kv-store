@@ -7,6 +7,7 @@ import com.g7.CPEN431.A7.consistentMap.ForwardList;
 import com.g7.CPEN431.A7.consistentMap.ServerRecord;
 import com.g7.CPEN431.A7.map.KeyWrapper;
 import com.g7.CPEN431.A7.map.ValueWrapper;
+import com.g7.CPEN431.A7.newProto.KVRequest.KVPair;
 import com.g7.CPEN431.A7.newProto.KVRequest.PutPair;
 
 import java.io.IOException;
@@ -46,7 +47,7 @@ public class RawPutHandler implements Callable<List<RawPutHandler.STATUS>> {
             List<PutPair> temp = new ArrayList<>();
             int currPacketSize = 0;
 
-            for (Iterator<PutPair> it = forwardInstructions.getKeyEntries().iterator(); it.hasNext();) {
+            for (Iterator<KVPair> it = forwardInstructions.getKeyEntries().iterator(); it.hasNext();) {
                 //take an "engineering" approximation, because serialization is expensive
                 PutPair pair = it.next();
                 boolean isLast = (!it.hasNext());
