@@ -613,10 +613,11 @@ public class KVServerTaskHandler implements Runnable {
             clientPool.addAll(borrowed);
             System.out.println("put done. ");
 
+            int oldlen = value == null ? 0 : value.getValue().length;
 
             RequestCacheValue res = scaf.setResponseType(PUT).build();
             pkt.set(generateAndSend(res));
-            bytesUsed.addAndGet(payload.getValue().length);
+            bytesUsed.addAndGet(payload.getValue().length - oldlen);
             return val;
         });
         mapLock.readLock().unlock();
@@ -666,7 +667,7 @@ public class KVServerTaskHandler implements Runnable {
 
 
         for (PutPair pair: pairs) {
-            if(!pair.hasKey() || !pair.hasValue())
+            if(!pair.hasKey())
             {
                 throw new IllegalArgumentException("Pair does not have fields");
             }
@@ -689,8 +690,20 @@ public class KVServerTaskHandler implements Runnable {
             mapLock.readLock().lock();
 
             map.compute(new KeyWrapper(pair.getKey()), (key, value) -> {
-                bytesUsed.addAndGet(pair.getValue().length);
-                return new ValueWrapper(pair.getValue(), pair.getVersion());
+                //it is a delete in disguise
+                if(!pair.hasValue())
+                {
+                    int oldLen = value == null ? 0 : value.getValue().length;
+                    bytesUsed.addAndGet(-oldLen);
+                    return null;
+                } else
+                {
+                    int oldLen = value == null ? 0 : value.getValue().length;
+                    bytesUsed.addAndGet(pair.getValue().length - oldLen);
+                    return new ValueWrapper(pair.getValue(), pair.getVersion());
+                }
+
+
             });
 
             mapLock.readLock().unlock();
