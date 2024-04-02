@@ -238,8 +238,8 @@ public class KVServerTaskHandler implements Runnable {
                     int selectedReplica = new Random().nextInt(N_REPLICAS);
                     unwrappedMessage.setSourceAddress(iPacket.getAddress());
                     unwrappedMessage.setSourcePort(iPacket.getPort());
-                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(selectedReplica));
-//                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(0));
+//                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(selectedReplica));
+                    DatagramPacket p = unwrappedMessage.generatePacket(destinations.get(0));
                     sendResponse(p);
                     return;
                 }
@@ -557,72 +557,120 @@ public class KVServerTaskHandler implements Runnable {
         mapLock.readLock().lock();
 
         //atomically put and respond, `tis thread safe.
+        long in = System.currentTimeMillis();
         AtomicReference<IOException> ioexception= new AtomicReference<>();
         AtomicReference<DatagramPacket> pkt = new AtomicReference<>();
         map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
             //prepare Value
-            ValueWrapper val = new ValueWrapper(payload.getValue(), payload.getVersion());
+            ValueWrapper newVal = new ValueWrapper(payload.getValue(), payload.getVersion());
 
 
-            //forward this to backups
-            List<ServerRecord> replicas = serverRing.getNReplicas(payload.getKey());
-            //remove myself
-            replicas.remove(0);
-            KVPair pair = new KVPair(payload.getKey(), payload.getValue(), payload.getVersion());
-            ExecutorCompletionService<List<RawPutHandler.STATUS>> ecs = new ExecutorCompletionService<>(threadPool);
-            List<KVClient> borrowed = new ArrayList<>();
-            for(ServerRecord server : replicas)
+            boolean forwardingSuccessful = forwardToReplica(payload);
+
+            if(forwardingSuccessful)
             {
-                ForwardList fl = new ForwardList(server);
-                fl.addToList(pair);
-                KVClient cl;
-                while((cl = clientPool.poll()) == null) Thread.yield();
-                ecs.submit(new RawPutHandler(fl, cl));
-                borrowed.add(cl);
-            }
+                int oldlen = value == null ? 0 : value.getValue().length;
 
-            for(int i = 0; i < N_REPLICAS - 1; i++)
+                RequestCacheValue res = scaf.setResponseType(PUT).build();
+                pkt.set(generateAndSend(res));
+                bytesUsed.addAndGet(payload.getValue().length - oldlen);
+                return newVal;
+            }
+            else
             {
-                Future<List<RawPutHandler.STATUS>> result;
-                List<RawPutHandler.STATUS> statuses;
-                try {
-                    result = ecs.take();
-                    statuses = result.get();
-                } catch (Exception e) {
-                    mapLock.readLock().unlock();
-                    System.err.println("Exception while sending!");
-                    clientPool.addAll(borrowed);
-                    throw new RuntimeException(e);
-                }
-
-                for(RawPutHandler.STATUS status : statuses)
-                {
-                    //return internal error
-                    if(status != RawPutHandler.STATUS.OK)
-                    {
-                        //todo fix this later
-                        System.err.println("failed to reach successors");
-                        RequestCacheValue res = scaf.setResponseType(NO_MEM).build();
-                        pkt.set(generateAndSend(res));
-                        bytesUsed.addAndGet(payload.getValue().length);
-                        return val;
-                    }
-                }
+                //maintain previous value
+                RequestCacheValue res = scaf.setResponseType(INTERNAL_ERROR).build();
+                pkt.set(generateAndSend(res));
+                return value;
             }
-
-            clientPool.addAll(borrowed);
-            System.out.println("put done. ");
-
-            int oldlen = value == null ? 0 : value.getValue().length;
-
-            RequestCacheValue res = scaf.setResponseType(PUT).build();
-            pkt.set(generateAndSend(res));
-            bytesUsed.addAndGet(payload.getValue().length - oldlen);
-            return val;
         });
+
+        System.out.println("OUT: " + (System.currentTimeMillis() - in));
         mapLock.readLock().unlock();
 
         return pkt.get();
+    }
+
+
+    private boolean forwardToReplica (UnwrappedPayload payload)
+    {
+
+        KVPair pair;
+
+        //handle different callees
+        if(payload.getCommand() == REQ_CODE_PUT)
+        {
+            assert payload.hasKey();
+            assert payload.hasValue();
+            pair = new KVPair(payload.getKey(), payload.getValue(), payload.getVersion());
+        }
+        else if (payload.getCommand() == REQ_CODE_DEL)
+        {
+            assert payload.hasKey();
+            //null -> delete.
+            pair = new KVPair(payload.getKey(), null, payload.getVersion());
+        }
+        else
+        {
+            throw new IllegalStateException("Function called by some idiot where it is not supposed to be");
+        }
+
+        //set up services for outbound requests w/ different threads.
+        ExecutorCompletionService<List<RawPutHandler.STATUS>> ecs = new ExecutorCompletionService<>(threadPool);
+        List<KVClient> borrowed = new ArrayList<>();
+
+        //get replicas
+        List<ServerRecord> replicas = serverRing.getNReplicas(payload.getKey());
+        //remove myself
+        replicas.remove(0);
+
+        //for each replica - create a task and submit to thread pool.
+        for(ServerRecord server : replicas)
+        {
+            ForwardList fl = new ForwardList(server);
+            fl.addToList(pair);
+            KVClient cl;
+            while((cl = clientPool.poll()) == null)
+            {
+                System.out.println("out of clients");
+                Thread.yield();
+            }
+            ecs.submit(new RawPutHandler(fl, cl));
+            borrowed.add(cl);
+        }
+
+        //join all the threads to get result.
+        for(int i = 0; i < N_REPLICAS - 1; i++)
+        {
+            Future<List<RawPutHandler.STATUS>> result;
+            List<RawPutHandler.STATUS> statuses;
+            try {
+                result = ecs.take();
+                statuses = result.get();
+            }
+            catch (InterruptedException | ExecutionException e) {
+                mapLock.readLock().unlock();
+                System.err.println("Exception while sending!");
+                clientPool.addAll(borrowed);
+                throw new RuntimeException(e);
+            }
+
+            for(RawPutHandler.STATUS status : statuses)
+            {
+                //return internal error if replicas cannot be reached
+                if(status != RawPutHandler.STATUS.OK)
+                {
+                    System.err.println("failed to reach successors");
+                    //no need to send packet here, it will be done when we return false
+                    //no change in bytes used. existing value kept.
+                    clientPool.addAll(borrowed);
+                    return false;
+                }
+            }
+        }
+
+        clientPool.addAll(borrowed);
+        return true;
     }
 
     /**
@@ -652,7 +700,6 @@ public class KVServerTaskHandler implements Runnable {
             return generateAndSend(res);
         }
 
-        System.out.println("last bulkput rcvd");
         bulkPutHelper(payload.getPutPair());
         waitingForReplicaTransfer.set(false);
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
@@ -779,9 +826,21 @@ public class KVServerTaskHandler implements Runnable {
                 RequestCacheValue res = scaf.setResponseType(NO_KEY).build();
                 pkt.set(generateAndSend(res));
             } else {
-                bytesUsed.addAndGet(-value.getValue().length);
-                RequestCacheValue res = scaf.setResponseType(DEL).build();
-                pkt.set(generateAndSend(res));
+
+                boolean forwardSuccess = forwardToReplica(payload);
+
+                if(forwardSuccess)
+                {
+                    bytesUsed.addAndGet(-value.getValue().length);
+                    RequestCacheValue res = scaf.setResponseType(DEL).build();
+                    pkt.set(generateAndSend(res));
+                }
+                else
+                {
+                    //no change.
+                    RequestCacheValue res = scaf.setResponseType(INTERNAL_ERROR).build();
+                    pkt.set(generateAndSend(res));
+                }
             }
             return null;
         });

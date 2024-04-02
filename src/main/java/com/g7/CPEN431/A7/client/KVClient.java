@@ -30,7 +30,8 @@ public class KVClient {
     int testSequence;
     UnwrappedMessage messageOnWire;
 
-    private final int timeout = 300;
+    private final int timeout;
+    private final int DEFAULT_TIMEOUT = 300;
     private int triesMax = 4;
 
     /* Test Result codes */
@@ -67,20 +68,14 @@ public class KVClient {
         this.serverPort = serverPort;
         this.socket = socket;
         this.publicBuf = publicBuf;
+        this.timeout = DEFAULT_TIMEOUT;
 
         socket.setSoTimeout(timeout);
     }
 
-    public KVClient(byte[] publicBuf){
+    public KVClient(byte[] publicBuf, int timeout){
         this.publicBuf = publicBuf;
-    }
-
-    public KVClient(InetAddress serverAddress, int serverPort, DatagramSocket socket, byte[] publicBuf, int testSequence) {
-        this.serverAddress = serverAddress;
-        this.serverPort = serverPort;
-        this.socket = socket;
-        this.publicBuf = publicBuf;
-        this.testSequence = testSequence;
+        this.timeout = timeout;
     }
 
     public void setDestination(InetAddress serverAddress, int serverPort)
@@ -384,6 +379,7 @@ public class KVClient {
                 socket.receive(rP);
             } catch (SocketTimeoutException e) {
                 tries++;
+                socket.setSoTimeout(socket.getSoTimeout() * 2);
                 continue;
                 //do nothing and let it loop
             }

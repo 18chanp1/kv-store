@@ -18,5 +18,6 @@ public enum ResponseType {
     NO_MEM,
     OVERLOAD_CACHE,
     OVERLOAD_THREAD,
-    OBITUARIES
+    OBITUARIES,
+    INTERNAL_ERROR
 }

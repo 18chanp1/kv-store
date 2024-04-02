@@ -52,7 +52,7 @@ public class DeathRegistrar extends TimerTask {
         updateBroadcastQueue();
         checkSelfSuspended();
         //check self suspended clears the queue, since anything in there is probably outdated.
-        checkIsAlive();
+//        checkIsAlive();
         gossip();
 
         previousPingSendTime = Instant.now().toEpochMilli();
@@ -83,7 +83,7 @@ public class DeathRegistrar extends TimerTask {
     {
         ServerRecord target;
         try {
-            target = ring.getRandomServer();
+            target = ring.getNextServer();
         } catch (ConsistentMap.NoServersException e) {
             System.err.println("no servers to gossip with");
             return;
@@ -95,10 +95,6 @@ public class DeathRegistrar extends TimerTask {
             throw new IllegalStateException();
         }
 
-        if(broadcastQueue.isEmpty() || target.equals(self) || target.equals(selfLoopback))
-        {
-            return;
-        }
 
         sender.setDestination(target.getAddress(), target.getServerPort());
         //update myself every time I gossip
@@ -110,12 +106,9 @@ public class DeathRegistrar extends TimerTask {
             r = sender.isDead(l);
         } catch (KVClient.ServerTimedOutException e)
         {
-            System.out.println("gossip sending failed");
-//            System.out.println("Server declared dead by gossip response");
-//            System.out.println("Port: " + target.getAddress().toString() + ":" +target.getPort());
-//            ring.setServerDeadNow(target);
-//            ring.removeServer(target);
-//            broadcastQueue.put(target, target);
+            System.out.println("gossip sending timeout, declaring death. ");
+            target.setLastSeenDeadAt(System.currentTimeMillis());
+            ring.updateServerState(target);
             return;
         } catch (Exception e) {
             System.out.println("Spreading gossip failed");
@@ -142,16 +135,6 @@ public class DeathRegistrar extends TimerTask {
             System.err.println("Gossip recipient's status size is not the same");
             return;
         }
-
-
-//        for(int i = 0; i < l.size(); i++)
-//        {
-//            if(responses.get(i) == KVServerTaskHandler.STAT_CODE_OLD && random.nextInt(K) == 0)
-//            {
-//                //delete the response
-//                broadcastQueue.remove( (ServerRecord) l.get(i));
-//            }
-//        }
     }
 
     /**
@@ -217,7 +200,7 @@ public class DeathRegistrar extends TimerTask {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 } catch (KVClient.ServerTimedOutException e) {
-                    System.out.println("Server is down");
+//                    System.out.println("Server is down");
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }

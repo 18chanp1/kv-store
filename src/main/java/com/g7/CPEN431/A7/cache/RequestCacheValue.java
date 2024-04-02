@@ -53,6 +53,7 @@ public class RequestCacheValue implements KVResponse {
             case RETRY_NOT_EQUAL:   this.errCode = KVServerTaskHandler.RES_CODE_RETRY_NOT_EQUAL;    break;
             case NO_KEY:            this.errCode = KVServerTaskHandler.RES_CODE_NO_KEY;             break;
             case NO_MEM:            this.errCode = KVServerTaskHandler.RES_CODE_NO_MEM;             break;
+            case INTERNAL_ERROR:    this.errCode = KVServerTaskHandler.RES_CODE_INTERNAL_ER;        break;
             case OBITUARIES:
             {
                 this.errCode = KVServerTaskHandler.RES_CODE_SUCCESS;

@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor;
+
 /**
  * Hello world!
  *
@@ -46,6 +48,7 @@ public class KVServer
     public final static int N_REPLICAS = 2;
     public static ServerRecord self;
     public static ServerRecord selfLoopback;
+    public static int INTERNODE_TIMEOUT = 20;
 
 
 
@@ -69,7 +72,7 @@ public class KVServer
 
             DatagramSocket server = new DatagramSocket(PORT);
             /* Eliminated in single thread */
-            ExecutorService executor = Executors.newCachedThreadPool();
+            ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
             ConcurrentMap<KeyWrapper, ValueWrapper> map
                     = ChronicleMap
@@ -112,8 +115,9 @@ public class KVServer
             ConcurrentLinkedQueue<KVClient> clientPool = new ConcurrentLinkedQueue<>();
             for(int i = 0; i < N_THREADS * N_REPLICAS; i++)
             {
-                clientPool.add(new KVClient(new byte[PACKET_MAX]));
+                clientPool.add(new KVClient(new byte[PACKET_MAX], INTERNODE_TIMEOUT));
             }
+
 
             /* Outbound Queue and Thread - eliminated in single thread implementation */
             ConcurrentLinkedQueue<DatagramPacket> outbound = new ConcurrentLinkedQueue<>();

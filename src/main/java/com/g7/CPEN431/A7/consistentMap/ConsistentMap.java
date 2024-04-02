@@ -297,19 +297,23 @@ public class ConsistentMap {
      */
     public ServerRecord getNextServer() throws NoServersException {
         lock.readLock().lock();
-        if(ring.isEmpty())
+        //if there is only 1 server (aka myself), remaining, crash.
+        if(ring.size() <= VNodes)
         {
             lock.readLock().unlock();
             throw new NoServersException();
         }
 
+        Map.Entry<Integer, VNode> server;
+        do
+        {
+            server = ring.ceilingEntry(current);
+            /* Deal with case where the successor of the key is past "0" */
+            server = (server == null) ? ring.firstEntry(): server;
 
-        Map.Entry<Integer, VNode> server = ring.ceilingEntry(current);
-        /* Deal with case where the successor of the key is past "0" */
-        server = (server == null) ? ring.firstEntry(): server;
-
-        /* Set the ptr so that next ceiling entry will be the following node in the ring */
-        current = server.getKey() + 1;
+            /* Set the ptr so that next ceiling entry will be the following node in the ring */
+            current = server.getKey() + 1;
+        } while (server.getValue().serverRecord.equals(self) || server.getValue().serverRecord.equals(selfLoopback));
 
         lock.readLock().unlock();
 
@@ -347,6 +351,7 @@ public class ConsistentMap {
                     ring.remove(v.getHash());
                 }
                 updated = true;
+                System.out.println(r.getPort());
             }
             // resurrection
             else if (!actualRecord.isAlive() && r.isAlive())
@@ -357,6 +362,7 @@ public class ConsistentMap {
                     ring.put(v.getHash(), v);
                 }
                 updated = true;
+                System.out.println(r.getPort());
             }
             //otherwise, it must be in the same state, thus ring does not need to be changed.
 
@@ -364,7 +370,7 @@ public class ConsistentMap {
             actualRecord.setCode(r.getCode());
             actualRecord.setInformationTime(r.getInformationTime());
 
-            System.out.println(getServerCount());
+            if(updated) System.out.println(getServerCount());
         }
         lock.writeLock().unlock();
         return updated;
@@ -441,7 +447,22 @@ public class ConsistentMap {
             /* forward keys for replica repair (I am main, and successors changed */
             byte[] pairKey = entry.getKey().getKey();
             REPLICA_TYPE type = isReplica(pairKey);
-            if(type == REPLICA_TYPE.PRIMARY)
+
+            if (type == REPLICA_TYPE.UNRELATED)
+            {
+                ServerRecord prim = new ServerRecord(getServer(pairKey));
+                m.compute(getServer(pairKey), (k, v) ->
+                {
+                    ForwardList forwardList;
+                    if(v == null) forwardList = new ForwardList(prim);
+                    else forwardList = v;
+
+                    forwardList.addToList(entry, true);
+
+                    return forwardList;
+                });
+            }
+            else if(type == REPLICA_TYPE.PRIMARY)
             {
                 for(ServerRecord diffServer : diff)
                 {
@@ -458,20 +479,7 @@ public class ConsistentMap {
                     });
                 }
             }
-            else if (type == REPLICA_TYPE.UNRELATED)
-            {
-                ServerRecord prim = new ServerRecord(getServer(pairKey));
-                m.compute(getServer(pairKey), (k, v) ->
-                {
-                    ForwardList forwardList;
-                    if(v == null) forwardList = new ForwardList(prim);
-                    else forwardList = v;
 
-                    forwardList.addToList(entry, true);
-
-                    return forwardList;
-                });
-            }
         });
 
         successors = getCurrentSuccessors();

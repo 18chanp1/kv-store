@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.BULKPUT_MAX_SZ;
+import static com.g7.CPEN431.A7.KVServer.INTERNODE_TIMEOUT;
 
 public class KeyTransferHandler implements Runnable {
     ReadWriteLock mapLock;
@@ -61,7 +62,7 @@ public class KeyTransferHandler implements Runnable {
 
 
         byte[] byteArr = new byte[16384];
-        KVClient sender = new KVClient(byteArr);
+        KVClient sender = new KVClient(byteArr, INTERNODE_TIMEOUT);
         List<KVPair> toDelete = new ArrayList<>();
 
         toBeForwarded.forEach((forwardList -> {
