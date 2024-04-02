@@ -4,13 +4,22 @@ public class KVPair implements PutPair {
     byte[] key;
     byte[] value;
     int version = 0;
+    boolean delete;
     public KVPair() {
+    }
+
+    public KVPair(byte[] key, byte[] value, int version, boolean delete) {
+        this.key = key;
+        this.value = value;
+        this.version = version;
+        this.delete = delete;
     }
 
     public KVPair(byte[] key, byte[] value, int version) {
         this.key = key;
         this.value = value;
         this.version = version;
+        this.delete = false;
     }
 
     @Override
@@ -65,5 +74,8 @@ public class KVPair implements PutPair {
         if (!(o instanceof PutPair)) return false;
         PutPair p = (PutPair) o;
         return p.getKey()==this.getKey() && p.getValue() == this.getValue() && p.getVersion() == this.getVersion();
+    }
+    public boolean isDelete() {
+        return delete;
     }
 }

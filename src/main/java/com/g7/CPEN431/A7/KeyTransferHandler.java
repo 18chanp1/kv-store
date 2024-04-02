@@ -7,6 +7,7 @@ import com.g7.CPEN431.A7.consistentMap.ForwardList;
 import com.g7.CPEN431.A7.consistentMap.ServerRecord;
 import com.g7.CPEN431.A7.map.KeyWrapper;
 import com.g7.CPEN431.A7.map.ValueWrapper;
+import com.g7.CPEN431.A7.newProto.KVRequest.KVPair;
 import com.g7.CPEN431.A7.newProto.KVRequest.PutPair;
 
 import java.io.IOException;
@@ -61,6 +62,7 @@ public class KeyTransferHandler implements Runnable {
 
         byte[] byteArr = new byte[16384];
         KVClient sender = new KVClient(byteArr);
+        List<KVPair> toDelete = new ArrayList<>();
 
         toBeForwarded.forEach((forwardList -> {
             ServerRecord target = forwardList.getDestination();
@@ -69,7 +71,7 @@ public class KeyTransferHandler implements Runnable {
                 System.out.println("transferring out " + forwardList.getKeyEntries().size() + "keys");
                 List<PutPair> temp = new ArrayList<>();
                 int currPacketSize = 0;
-                for (PutPair pair : forwardList.getKeyEntries()) {
+                for (KVPair pair : forwardList.getKeyEntries()) {
                     //take an "engineering" approximation, because serialization is expensive
                     int pairLen = pair.getKey().length + pair.getValue().length + Integer.BYTES;
 
@@ -84,8 +86,8 @@ public class KeyTransferHandler implements Runnable {
                     }
                     //add to the buffer.
                     temp.add(pair);
+                    if(pair.isDelete()) toDelete.add(pair);
                     currPacketSize += pairLen;
-
                 }
                 //clear the buffer.
                 System.out.println("sending" + temp.size() + "pairs");
@@ -107,10 +109,10 @@ public class KeyTransferHandler implements Runnable {
             }
 
             /* remove entries in our own server */
-            forwardList.getKeyEntries().forEach((entry) ->
+            toDelete.forEach((pair) ->
             {
-                map.remove(new KeyWrapper(entry.getKey()));
-                bytesUsed.addAndGet(-entry.getValue().length);
+                map.remove(new KeyWrapper(pair.getKey()));
+                bytesUsed.addAndGet(-pair.getValue().length);
             });
         }));
 

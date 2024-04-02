@@ -52,6 +52,7 @@ public class KVClient {
     public final static int REQ_CODE_MEM = 0X08;
     public final static int REQ_CODE_DED = 0x100;
     public final static int REQ_CODE_BULKPUT = 0x200;
+    public final static int REQ_CODE_BULKPUT_FIN = 0x201;
 
     public final static int RES_CODE_SUCCESS = 0x0;
     public final static int RES_CODE_NO_KEY = 0x1;
@@ -231,16 +232,24 @@ public class KVClient {
         return res;
     }
 
-    public ServerResponse bulkPut(List<PutPair> pairs, ServerRecord primaryServer) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse bulkPut(List<PutPair> pairs) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         UnwrappedPayload pl = new UnwrappedPayload();
         assert pairs != null;
         pl.setCommand(REQ_CODE_BULKPUT);
         pl.setPutPair(pairs);
-        pl.setPrimaryServer(primaryServer);
         return sendAndReceiveServerResponse(pl);
     }
 
-    public ServerResponse put(byte[] key, byte[] value, int version) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse bulkPutDone(List<PutPair> pairs) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+        UnwrappedPayload pl = new UnwrappedPayload();
+        assert pairs != null;
+        pl.setCommand(REQ_CODE_BULKPUT_FIN);
+        pl.setPutPair(pairs);
+        return sendAndReceiveServerResponse(pl);
+    }
+
+
+    private ServerResponse put(byte[] key, byte[] value, int version) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         /* Generate isAlive Message */
         UnwrappedPayload pl = new UnwrappedPayload();
         pl.setCommand(REQ_CODE_PUT);
