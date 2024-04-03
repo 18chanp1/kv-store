@@ -14,30 +14,35 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.TimerTask;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.BULKPUT_MAX_SZ;
 import static com.g7.CPEN431.A7.KVServer.INTERNODE_TIMEOUT;
 
-public class KeyTransferHandler implements Runnable {
+public class KeyTransferHandler extends TimerTask {
     ReadWriteLock mapLock;
     ConcurrentMap<KeyWrapper, ValueWrapper> map;
     AtomicInteger bytesUsed;
     ConsistentMap serverRing;
-    ConcurrentLinkedQueue pendingRecordDeaths;
+    BlockingQueue<ServerRecord> pendingRecordDeaths;
+    AtomicBoolean transferPending;
 
     public KeyTransferHandler(ReadWriteLock mapLock,
                               ConcurrentMap<KeyWrapper, ValueWrapper> map,
                               AtomicInteger bytesUsed, ConsistentMap serverRing,
-                              ConcurrentLinkedQueue pendingRecordDeaths) {
+                              BlockingQueue<ServerRecord> pendingRecordDeaths,
+                              AtomicBoolean transferPending) {
         this.mapLock = mapLock;
         this.map = map;
         this.bytesUsed = bytesUsed;
         this.serverRing = serverRing;
         this.pendingRecordDeaths = pendingRecordDeaths;
+        this.transferPending = transferPending;
     }
 
     @Override
@@ -45,14 +50,6 @@ public class KeyTransferHandler implements Runnable {
         transferKeys();
     }
 
-    private void floodRecords()
-    {
-        Collection<ServerRecord> allServers = serverRing.getAllRecords();
-        for(ServerRecord server: allServers)
-        {
-            pendingRecordDeaths.add(server);
-        }
-    }
 
     private void transferKeys() {
 
@@ -96,7 +93,6 @@ public class KeyTransferHandler implements Runnable {
             } catch (KVClient.ServerTimedOutException e) {
                 // TODO: Probably a wise idea to redirect the keys someplace else, but that is a problem for future me.
                 System.out.println("Bulk transfer timed out. Marking recipient as dead.");
-                mapLock.writeLock().unlock();
                 return;
             } catch (KVClient.MissingValuesException e) {
                 mapLock.writeLock().unlock();
@@ -117,6 +113,8 @@ public class KeyTransferHandler implements Runnable {
             });
         }));
 
+
         mapLock.writeLock().unlock();
+        transferPending.compareAndSet(true, false);
     }
 }

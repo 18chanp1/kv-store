@@ -48,7 +48,7 @@ public class KVServer
     public final static int N_REPLICAS = 2;
     public static ServerRecord self;
     public static ServerRecord selfLoopback;
-    public static int INTERNODE_TIMEOUT = 20;
+    public static int INTERNODE_TIMEOUT = 30;
 
 
 
@@ -72,7 +72,7 @@ public class KVServer
 
             DatagramSocket server = new DatagramSocket(PORT);
             /* Eliminated in single thread */
-            ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+            ExecutorService executor = Executors.newFixedThreadPool(8);
 
             ConcurrentMap<KeyWrapper, ValueWrapper> map
                     = ChronicleMap
@@ -106,13 +106,13 @@ public class KVServer
 
             /* Setup pool of byte arrays - single thread implementation only has 1 */
             /* A simpler approach to keeping track of byte arrays*/
-            ConcurrentLinkedQueue<byte[]> bytePool = new ConcurrentLinkedQueue<>();
+            BlockingQueue<byte[]> bytePool = new LinkedBlockingQueue<>();
             for(int i = 0; i < N_THREADS + 2; i++) {
                 bytePool.add(new byte[PACKET_MAX]);
             }
 
             /* Setup pool of clients */
-            ConcurrentLinkedQueue<KVClient> clientPool = new ConcurrentLinkedQueue<>();
+            BlockingQueue<KVClient> clientPool = new LinkedBlockingQueue<>();
             for(int i = 0; i < N_THREADS * N_REPLICAS; i++)
             {
                 clientPool.add(new KVClient(new byte[PACKET_MAX], INTERNODE_TIMEOUT));
@@ -120,18 +120,15 @@ public class KVServer
 
 
             /* Outbound Queue and Thread - eliminated in single thread implementation */
-            ConcurrentLinkedQueue<DatagramPacket> outbound = new ConcurrentLinkedQueue<>();
+            BlockingQueue<DatagramPacket> outbound = new LinkedBlockingQueue<>();
             executor.execute(() -> {
                 while (true) {
-                    if(!outbound.isEmpty()) {
-                        try {
-                            server.send(outbound.poll());
-                        } catch (IOException e) {
-                            System.err.println("Failure to send packets");
-                            throw new RuntimeException(e);
-                        }
-                    } else {
-                        Thread.yield();
+                    try {
+                        server.send(outbound.take());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
                 }
             });
@@ -140,7 +137,7 @@ public class KVServer
             ConsistentMap serverRing = new ConsistentMap(VNODE_COUNT, N_REPLICAS, SERVER_LIST);
 
             /* Set up obituary list */
-            ConcurrentLinkedQueue<ServerRecord> pendingRecordDeaths = new ConcurrentLinkedQueue();
+            BlockingQueue<ServerRecord> pendingRecordDeaths = new LinkedBlockingQueue<>();
 
             /* Set up last update time */
             AtomicLong lastReqTime = new AtomicLong(Instant.now().toEpochMilli() + GOSSIP_WAIT_INIT + GOSSIP_INTERVAL);
@@ -152,6 +149,23 @@ public class KVServer
             Timer timer = new Timer();
             timer.schedule(new DeathRegistrar(pendingRecordDeaths, serverRing, lastReqTime, waitingForIncomingTransfer), GOSSIP_WAIT_INIT, GOSSIP_INTERVAL);
 
+            /* setup dedicated status handler */
+            executor.execute(new StatusHandler(bytePool,
+                    new DatagramSocket(PORT * 2),
+                    executor,
+                    requestCache,
+                    map,
+                    mapLock,
+                    bytesUsed,
+                    outbound,
+                    serverRing,
+                    pendingRecordDeaths,
+                    lastReqTime,
+                    clientPool,
+                    waitingForIncomingTransfer
+            ));
+
+
 
             while(true){
 
@@ -159,8 +173,7 @@ public class KVServer
                 long remainingMemory  = r.maxMemory() - (r.totalMemory() - r.freeMemory());
                 boolean isOverloaded = remainingMemory < MEMORY_SAFETY;
 
-                byte[] iBuf;
-                while((iBuf = bytePool.poll()) == null) Thread.yield();
+                byte[] iBuf = bytePool.poll(5, TimeUnit.SECONDS);
 
                 DatagramPacket iPacket = new DatagramPacket(iBuf, iBuf.length);
                 server.receive(iPacket);

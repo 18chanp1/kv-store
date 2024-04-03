@@ -23,7 +23,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.BULKPUT_MAX_SZ;
 
-public class RawPutHandler implements Callable<List<RawPutHandler.STATUS>> {
+public class RawPutHandler implements Callable<RawPutHandler.RESULT> {
     ForwardList forwardInstructions;
     KVClient client;
 
@@ -34,12 +34,12 @@ public class RawPutHandler implements Callable<List<RawPutHandler.STATUS>> {
     }
 
     @Override
-    public List<STATUS> call() throws Exception {
+    public RESULT call() throws Exception {
         return forwardPut();
     }
 
 
-    private List<STATUS> forwardPut() {
+    private RESULT forwardPut() {
         ServerRecord target = forwardInstructions.getDestination();
         client.setDestination(target.getAddress(), target.getPort());
         List<STATUS> results = new ArrayList<>();
@@ -51,7 +51,10 @@ public class RawPutHandler implements Callable<List<RawPutHandler.STATUS>> {
                 //take an "engineering" approximation, because serialization is expensive
                 PutPair pair = it.next();
                 boolean isLast = (!it.hasNext());
-                int pairLen = pair.getKey().length + pair.getValue().length + Integer.BYTES;
+                int pairLen = 0;
+                pairLen += pair.getKey().length;
+                pairLen += pair.hasValue() ?  pair.getValue().length : 0;
+                pairLen += Integer.BYTES;
 
                 //clear the outgoing buffer and send the packet
                 if (currPacketSize + pairLen >= BULKPUT_MAX_SZ) {
@@ -80,9 +83,11 @@ public class RawPutHandler implements Callable<List<RawPutHandler.STATUS>> {
                results.add(res.getErrCode() == KVServerTaskHandler.RES_CODE_SUCCESS ? STATUS.OK: STATUS.FAIL);
             }
 
+            System.out.println("raw put success");
+
         } catch (KVClient.ServerTimedOutException e) {
             // TODO: Probably a wise idea to redirect the keys someplace else, but that is a problem for future me.
-            System.out.println("Bulk transfer timed out. Marking recipient as dead.");
+            System.out.println("Raw put timed out.");
             results.add(STATUS.TIMEOUT);
         } catch (KVClient.MissingValuesException e) {
             throw new RuntimeException(e);
@@ -92,7 +97,8 @@ public class RawPutHandler implements Callable<List<RawPutHandler.STATUS>> {
             throw new RuntimeException(e);
         }
 
-        return results;
+
+        return new RESULT(results, this.forwardInstructions);
     }
 
     public static enum STATUS
@@ -101,4 +107,16 @@ public class RawPutHandler implements Callable<List<RawPutHandler.STATUS>> {
         TIMEOUT,
         FAIL,
     }
+
+    public static class RESULT
+    {
+        List<STATUS> s;
+        ForwardList l;
+
+        public RESULT(List<STATUS> s, ForwardList l) {
+            this.s = s;
+            this.l = l;
+        }
+    }
+
 }

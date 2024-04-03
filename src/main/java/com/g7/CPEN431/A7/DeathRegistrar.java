@@ -10,18 +10,15 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import static com.g7.CPEN431.A7.KVServer.*;
-import static com.g7.CPEN431.A7.consistentMap.ServerRecord.CODE_DED;
 
 public class DeathRegistrar extends TimerTask {
     Map<ServerRecord, ServerRecord> broadcastQueue;
-    ConcurrentLinkedQueue<ServerRecord> pendingRecords;
+    BlockingQueue<ServerRecord> pendingRecords;
     ConsistentMap ring;
     KVClient sender;
     Random random;
@@ -32,7 +29,7 @@ public class DeathRegistrar extends TimerTask {
     final static int SUSPENDED_THRESHOLD = 5000;
     final static int K = 10;
 
-    public DeathRegistrar(ConcurrentLinkedQueue<ServerRecord> pendingRecords,
+    public DeathRegistrar(BlockingQueue<ServerRecord> pendingRecords,
                           ConsistentMap ring,
                           AtomicLong lastReqTime,
                           AtomicBoolean waitingForIncomingTransfer)
@@ -96,7 +93,7 @@ public class DeathRegistrar extends TimerTask {
         }
 
 
-        sender.setDestination(target.getAddress(), target.getServerPort());
+        sender.setDestination(target.getAddress(), target.getServerPort() * 2);
         //update myself every time I gossip
         self.setAliveAtTime(System.currentTimeMillis());
         ring.updateServerState(self);
@@ -156,7 +153,7 @@ public class DeathRegistrar extends TimerTask {
                 return;
             }
 
-            sender.setDestination(target.getAddress(), target.getServerPort());
+            sender.setDestination(target.getAddress(), target.getServerPort() * 2);
             sender.isAlive();
 //            ring.setServerAlive(target);
         } catch (ConsistentMap.NoServersException | IOException | KVClient.MissingValuesException |
@@ -192,7 +189,7 @@ public class DeathRegistrar extends TimerTask {
             //send one by one
             for(ServerEntry server : ring.getFullRecord())
             {
-                sender.setDestination(((ServerRecord) server).getAddress(), server.getServerPort());
+                sender.setDestination(((ServerRecord) server).getAddress(), server.getServerPort() * 2);
                 try {
                     sender.isDead(ring.getFullRecord());
                 } catch (KVClient.MissingValuesException e) {

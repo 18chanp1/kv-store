@@ -12,11 +12,10 @@ import com.g7.CPEN431.A7.newProto.KVMsg.KVMsg;
 import com.g7.CPEN431.A7.newProto.KVMsg.KVMsgFactory;
 import com.g7.CPEN431.A7.newProto.KVMsg.KVMsgSerializer;
 import com.g7.CPEN431.A7.newProto.KVRequest.*;
-import com.g7.CPEN431.A7.wrappers.PB_ContentType;
-import com.g7.CPEN431.A7.wrappers.PublicBuffer;
 import com.g7.CPEN431.A7.wrappers.UnwrappedMessage;
 import com.g7.CPEN431.A7.wrappers.UnwrappedPayload;
 import com.google.common.cache.Cache;
+import net.openhft.chronicle.wire.SelfDescribingMarshallable;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -40,7 +39,7 @@ import static com.g7.CPEN431.A7.consistentMap.ServerRecord.CODE_DED;
 public class KVServerTaskHandler implements Runnable {
     /* Thread parameters */
     private final AtomicLong lastReqTime;
-    private final AtomicBoolean waitingForReplicaTransfer;
+    private final AtomicBoolean transferPending;
     private final AtomicInteger bytesUsed;
     private final DatagramPacket iPacket;
     private final Cache<RequestCacheKey, DatagramPacket> requestCache;
@@ -57,11 +56,13 @@ public class KVServerTaskHandler implements Runnable {
      */
     private ConsistentMap serverRing;
 
-    final private ConcurrentLinkedQueue<byte[]> bytePool;  //this is thread safe
     final private boolean isOverloaded;
-    final private ConcurrentLinkedQueue<DatagramPacket> outbound;
-    final private ConcurrentLinkedQueue<ServerRecord>pendingRecordDeaths;
-    final private ConcurrentLinkedQueue<KVClient> clientPool;
+    final private BlockingQueue<DatagramPacket> outbound;
+    final private BlockingQueue<byte[]> bytePool;  //this is thread safe
+    final private BlockingQueue<ServerRecord> pendingRecordDeaths;
+    final private BlockingQueue<KVClient> clientPool;
+
+    private boolean byteArrReturned = false;
     //do not use
     ExecutorService threadPool;
 
@@ -108,15 +109,15 @@ public class KVServerTaskHandler implements Runnable {
                                ConcurrentMap<KeyWrapper, ValueWrapper> map,
                                ReadWriteLock mapLock,
                                AtomicInteger bytesUsed,
-                               ConcurrentLinkedQueue<byte[]> bytePool,
+                               BlockingQueue<byte[]> bytePool,
                                boolean isOverloaded,
-                               ConcurrentLinkedQueue<DatagramPacket> outbound,
+                               BlockingQueue<DatagramPacket> outbound,
                                ConsistentMap serverRing,
-                               ConcurrentLinkedQueue<ServerRecord> pendingRecordDeaths,
+                               BlockingQueue<ServerRecord> pendingRecordDeaths,
                                ExecutorService threadPool,
                                AtomicLong lastReqTime,
-                               ConcurrentLinkedQueue<KVClient> clientPool,
-                               AtomicBoolean waitingForReplicaTransfer) {
+                               BlockingQueue<KVClient> clientPool,
+                               AtomicBoolean transferPending) {
         this.iPacket = iPacket;
         this.requestCache = requestCache;
         this.map = map;
@@ -130,12 +131,12 @@ public class KVServerTaskHandler implements Runnable {
         this.threadPool = threadPool;
         this.lastReqTime = lastReqTime;
         this.clientPool = clientPool;
-        this.waitingForReplicaTransfer = waitingForReplicaTransfer;
+        this.transferPending = transferPending;
 
     }
 
     // empty constructor for testing DeathUpdateTest
-    public KVServerTaskHandler(ConsistentMap serverRing, ConcurrentLinkedQueue<ServerRecord> pendingRecordDeaths) {
+    public KVServerTaskHandler(ConsistentMap serverRing, BlockingQueue<ServerRecord> pendingRecordDeaths) {
         this.iPacket = null;
         this.requestCache = null;
         this.map = null;
@@ -147,8 +148,8 @@ public class KVServerTaskHandler implements Runnable {
         this.serverRing = serverRing;
         this.pendingRecordDeaths = pendingRecordDeaths;
         this.lastReqTime = new AtomicLong();
-        this.clientPool = new ConcurrentLinkedQueue<>();
-        this.waitingForReplicaTransfer = new AtomicBoolean();
+        this.clientPool = new LinkedBlockingQueue<>();
+        this.transferPending = new AtomicBoolean();
     }
 
     // empty constructor for testing BulkPutTest
@@ -164,8 +165,8 @@ public class KVServerTaskHandler implements Runnable {
         this.serverRing = null;
         this.pendingRecordDeaths = null;
         this.lastReqTime = new AtomicLong();
-        this.clientPool = new ConcurrentLinkedQueue<>();
-        this.waitingForReplicaTransfer = new AtomicBoolean();
+        this.clientPool = new LinkedBlockingQueue<>();
+        this.transferPending = new AtomicBoolean();
     }
 
 
@@ -181,7 +182,8 @@ public class KVServerTaskHandler implements Runnable {
         }
         finally {
             // Return shared objects to the pool
-            bytePool.offer(iPacket.getData());
+            if(!byteArrReturned) bytePool.add(iPacket.getData());
+            byteArrReturned = true;
         }
     }
 
@@ -288,6 +290,11 @@ public class KVServerTaskHandler implements Runnable {
 
 
         /* Requests here can be handled locally */
+
+        //packet is no longer necessary
+        if(!byteArrReturned) bytePool.add(iPacket.getData());
+        byteArrReturned = true;
+
         DatagramPacket reply;
         try {
             reply = requestCache.get(new RequestCacheKey(unwrappedMessage.getMessageID(), unwrappedMessage.getCheckSum()),
@@ -419,7 +426,7 @@ public class KVServerTaskHandler implements Runnable {
         if (responseSent) throw new IllegalStateException();
 
         responseSent = true;
-        outbound.offer(d);
+        outbound.add(d);
     }
 
 
@@ -565,15 +572,17 @@ public class KVServerTaskHandler implements Runnable {
         mapLock.readLock().lock();
 
         //atomically put and respond, `tis thread safe.
-        long in = System.currentTimeMillis();
         AtomicReference<IOException> ioexception= new AtomicReference<>();
         AtomicReference<DatagramPacket> pkt = new AtomicReference<>();
+
+        boolean forwardingSuccessful = forwardToReplica(payload);
+//        boolean forwardingSuccessful = true;
+
+
+
         map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
             //prepare Value
             ValueWrapper newVal = new ValueWrapper(payload.getValue(), payload.getVersion());
-
-
-            boolean forwardingSuccessful = forwardToReplica(payload);
 
             if(forwardingSuccessful)
             {
@@ -587,13 +596,12 @@ public class KVServerTaskHandler implements Runnable {
             else
             {
                 //maintain previous value
-                RequestCacheValue res = scaf.setResponseType(INTERNAL_ERROR).build();
+                RequestCacheValue res = scaf.setResponseType(OVERLOAD_CACHE).build();
                 pkt.set(generateAndSend(res));
                 return value;
             }
         });
 
-        System.out.println("OUT: " + (System.currentTimeMillis() - in));
         mapLock.readLock().unlock();
 
         return pkt.get();
@@ -624,7 +632,7 @@ public class KVServerTaskHandler implements Runnable {
         }
 
         //set up services for outbound requests w/ different threads.
-        ExecutorCompletionService<List<RawPutHandler.STATUS>> ecs = new ExecutorCompletionService<>(threadPool);
+        ExecutorCompletionService<RawPutHandler.RESULT> ecs = new ExecutorCompletionService<>(threadPool);
         List<KVClient> borrowed = new ArrayList<>();
 
         //get replicas
@@ -638,27 +646,31 @@ public class KVServerTaskHandler implements Runnable {
             ForwardList fl = new ForwardList(server);
             fl.addToList(pair);
             KVClient cl;
-            while((cl = clientPool.poll()) == null)
-            {
-                System.out.println("out of clients");
-                Thread.yield();
+
+            try {
+                cl = clientPool.take();
+                borrowed.add(cl);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
+
             ecs.submit(new RawPutHandler(fl, cl));
-            borrowed.add(cl);
         }
 
         //join all the threads to get result.
         for(int i = 0; i < N_REPLICAS - 1; i++)
         {
-            Future<List<RawPutHandler.STATUS>> result;
+            Future<RawPutHandler.RESULT> result;
             List<RawPutHandler.STATUS> statuses;
+            int port = 0;
             try {
                 result = ecs.take();
-                statuses = result.get();
+                statuses = result.get().s;
+                port = result.get().l.getDestination().getPort();
             }
             catch (InterruptedException | ExecutionException e) {
                 mapLock.readLock().unlock();
-                System.err.println("Exception while sending!");
+                System.err.println("Exception while sending to " + port);
                 clientPool.addAll(borrowed);
                 throw new RuntimeException(e);
             }
@@ -668,7 +680,7 @@ public class KVServerTaskHandler implements Runnable {
                 //return internal error if replicas cannot be reached
                 if(status != RawPutHandler.STATUS.OK)
                 {
-                    System.err.println("failed to reach successors");
+                    System.err.println("failed to reach successors at port: " + port);
                     //no need to send packet here, it will be done when we return false
                     //no change in bytes used. existing value kept.
                     clientPool.addAll(borrowed);
@@ -708,8 +720,9 @@ public class KVServerTaskHandler implements Runnable {
             return generateAndSend(res);
         }
 
+        System.out.println("received bulkput fin");
+
         bulkPutHelper(payload.getPutPair());
-        waitingForReplicaTransfer.set(false);
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
         return generateAndSend(res);
     }
@@ -733,7 +746,7 @@ public class KVServerTaskHandler implements Runnable {
                 throw new IllegalArgumentException("0 Length keys detected");
             }
 
-            if(pair.getValue().length > VALUE_MAX_LEN)
+            if(pair.hasValue() && pair.getValue().length > VALUE_MAX_LEN)
             {
                 throw new IllegalArgumentException("Length too long detected");
             }
@@ -846,7 +859,7 @@ public class KVServerTaskHandler implements Runnable {
                 else
                 {
                     //no change.
-                    RequestCacheValue res = scaf.setResponseType(INTERNAL_ERROR).build();
+                    RequestCacheValue res = scaf.setResponseType(OVERLOAD_CACHE).build();
                     pkt.set(generateAndSend(res));
                 }
             }
@@ -945,7 +958,12 @@ public class KVServerTaskHandler implements Runnable {
         /* Key transfer after ring state is up-to-date */
         if(serverRingUpdated)
         {
-            transferKeys();
+            boolean updateNeeded = transferPending.compareAndSet(false, true);
+            if(updateNeeded)
+            {
+                Timer t = new Timer();
+                t.schedule(new KeyTransferHandler(mapLock, map, bytesUsed, serverRing, pendingRecordDeaths, transferPending), 15_000);
+            };
         }
 
         return serverStatusCodes;
@@ -955,10 +973,6 @@ public class KVServerTaskHandler implements Runnable {
      * Finds keys for which current server is successor and transfers them to the new server
      * Should be executed after the map state is updated.
      */
-
-    private void transferKeys() {
-        threadPool.submit(new KeyTransferHandler(mapLock, map, bytesUsed, serverRing, pendingRecordDeaths));
-    }
 
     // Custom Exceptions
 

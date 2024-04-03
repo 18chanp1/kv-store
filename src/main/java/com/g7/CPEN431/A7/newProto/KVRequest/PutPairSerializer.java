@@ -1,6 +1,7 @@
 package com.g7.CPEN431.A7.newProto.KVRequest;
 
 import com.g7.CPEN431.A7.newProto.shared.*;
+
 public final class PutPairSerializer {
  public static byte[] serialize(PutPair message) {
   try {
@@ -136,12 +137,6 @@ public final class PutPairSerializer {
  private static void assertInitialized(PutPair message) {
   if( !message.hasKey()) {
    throw new IllegalArgumentException("Required field not initialized: key");
-  }
-  if( !message.hasValue()) {
-   throw new IllegalArgumentException("Required field not initialized: value");
-  }
-  if( !message.hasVersion()) {
-   throw new IllegalArgumentException("Required field not initialized: version");
   }
  }
 }
