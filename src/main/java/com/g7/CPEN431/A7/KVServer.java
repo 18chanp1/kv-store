@@ -72,7 +72,7 @@ public class KVServer
 
             DatagramSocket server = new DatagramSocket(PORT);
             /* Eliminated in single thread */
-            ExecutorService executor = Executors.newFixedThreadPool(8);
+            ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
             ConcurrentMap<KeyWrapper, ValueWrapper> map
                     = ChronicleMap
@@ -173,7 +173,15 @@ public class KVServer
                 long remainingMemory  = r.maxMemory() - (r.totalMemory() - r.freeMemory());
                 boolean isOverloaded = remainingMemory < MEMORY_SAFETY;
 
-                byte[] iBuf = bytePool.poll(5, TimeUnit.SECONDS);
+                int sz = bytePool.size();
+                if(sz < 32)
+                {
+                    System.out.println("bytes remaining: " + bytePool.size() + " Port: " + PORT);
+
+                }
+
+
+                byte[] iBuf = bytePool.poll(500, TimeUnit.SECONDS);
 
                 DatagramPacket iPacket = new DatagramPacket(iBuf, iBuf.length);
                 server.receive(iPacket);

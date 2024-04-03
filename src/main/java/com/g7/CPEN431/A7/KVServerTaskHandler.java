@@ -17,6 +17,7 @@ import com.g7.CPEN431.A7.wrappers.UnwrappedPayload;
 import com.google.common.cache.Cache;
 import net.openhft.chronicle.wire.SelfDescribingMarshallable;
 
+import javax.lang.model.type.ExecutableType;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -631,14 +632,17 @@ public class KVServerTaskHandler implements Runnable {
             throw new IllegalStateException("Function called by some idiot where it is not supposed to be");
         }
 
-        //set up services for outbound requests w/ different threads.
-        ExecutorCompletionService<RawPutHandler.RESULT> ecs = new ExecutorCompletionService<>(threadPool);
-        List<KVClient> borrowed = new ArrayList<>();
+
 
         //get replicas
         List<ServerRecord> replicas = serverRing.getNReplicas(payload.getKey());
         //remove myself
         replicas.remove(0);
+
+        //set up services for outbound requests w/ different threads.
+        ExecutorService ntp = Executors.newVirtualThreadPerTaskExecutor();
+        ExecutorCompletionService<RawPutHandler.RESULT> ecs = new ExecutorCompletionService<>(ntp);
+        List<KVClient> borrowed = new ArrayList<>();
 
         //for each replica - create a task and submit to thread pool.
         for(ServerRecord server : replicas)
