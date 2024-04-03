@@ -63,6 +63,7 @@ public class KVServerTaskHandler implements Runnable {
     final private ConcurrentLinkedQueue<DatagramPacket> outbound;
     final private ConcurrentLinkedQueue<ServerRecord>pendingRecordDeaths;
     ExecutorService threadPool;
+    KVClient client;
 
     /* Constants */
     public final static int KEY_MAX_LEN = 32;
@@ -113,7 +114,7 @@ public class KVServerTaskHandler implements Runnable {
                                ConsistentMap serverRing,
                                ConcurrentLinkedQueue<ServerRecord> pendingRecordDeaths,
                                ExecutorService threadPool,
-                               AtomicLong lastReqTime) {
+                               AtomicLong lastReqTime) throws SocketException {
         this.iPacket = iPacket;
         this.requestCache = requestCache;
         this.map = map;
@@ -126,6 +127,8 @@ public class KVServerTaskHandler implements Runnable {
         this.pendingRecordDeaths = pendingRecordDeaths;
         this.threadPool = threadPool;
         this.lastReqTime = lastReqTime;
+        this.client = new KVClient(null, 0, new DatagramSocket(),new byte[16384]);
+
 
     }
 
@@ -239,7 +242,12 @@ public class KVServerTaskHandler implements Runnable {
                 byte[] key = payload.getKey();
                 ServerRecord destination = serverRing.getServer(key);
 
-                if((!destination.equals(self)) && (!destination.equals(selfLoopback)))
+                //Primary server is dead, I am a replica, and its just a get request
+                //If handleWithReplica true, then we will handle the request
+                //Else, it gets forwarded to primary
+                boolean handleWithReplica = !destination.isAlive() && payload.getCommand() == REQ_CODE_GET && self.getBackupServersFor().contains(destination);
+
+                if((!destination.equals(self)) && (!destination.equals(selfLoopback)) && !handleWithReplica)
                 {
                     // Set source so packet will be sent to correct sender.
                     unwrappedMessage.setSourceAddress(iPacket.getAddress());
@@ -543,7 +551,6 @@ public class KVServerTaskHandler implements Runnable {
 
         mapLock.readLock().lock();
         AtomicReference<DatagramPacket> pkt = new AtomicReference<>();
-        KVClient client = new KVClient(self.getAddress(), self.getPort(), new DatagramSocket(),new byte[16384]);
         ServerRecord primaryServer = (ServerRecord) payload.getPrimaryServer();
 
         if (primaryServer.equals(self)) {
@@ -559,7 +566,7 @@ public class KVServerTaskHandler implements Runnable {
 
             for (ServerRecord backup : self.getMyBackupServers()) {
                 client.setDestination(backup.getAddress(), backup.getPort());
-                updateBackupServer(payload, client, null);
+                updateBackupServer(payload, client, primaryServer);
             }
         } else {
             //redirect to primary server
@@ -596,7 +603,7 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
 
         for (ServerRecord backup : self.getMyBackupServers()) {
-            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+            client.setDestination(backup.getAddress(), backup.getPort());
             updateBackupServer(payload, client, null);
         }
 
@@ -706,7 +713,6 @@ public class KVServerTaskHandler implements Runnable {
         //atomically del and respond
         AtomicReference<DatagramPacket> pkt = new AtomicReference<>();
         mapLock.readLock().lock();
-        KVClient client = new KVClient(self.getAddress(), self.getPort(), new DatagramSocket(),new byte[16384]);
         ServerRecord primaryServer = (ServerRecord) payload.getPrimaryServer();
 
         if (primaryServer.equals(self)) {
@@ -736,8 +742,6 @@ public class KVServerTaskHandler implements Runnable {
                 RequestCacheValue res = scaf.setResponseType(TIMEOUT).build();
                 pkt.set(generateAndSend(res));
             }
-
-
         }
 
 
@@ -750,13 +754,12 @@ public class KVServerTaskHandler implements Runnable {
      * @param payload Payload from the client
      * @return The packet sent
      */
-    private DatagramPacket handleWipeout(RequestCacheValue.Builder scaf, UnwrappedPayload payload) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
+    private DatagramPacket handleWipeout(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if(payload.hasValue() || payload.hasVersion() || payload.hasKey())
         {
             RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
-
 
         //atomically wipe and respond
         mapLock.writeLock().lock();
@@ -765,7 +768,6 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue res = scaf.setResponseType(WIPEOUT).build();
         DatagramPacket pkt = generateAndSend(res);
         mapLock.writeLock().unlock();
-
 
         System.gc();
 
@@ -823,9 +825,8 @@ public class KVServerTaskHandler implements Runnable {
                             //get our put-pairs to send to the new backup server
                             List<PutPair> ourPutPairs = getOurPutPairs();
 
-
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut
-                            KVClient client = new KVClient(newBackupServer.getAddress(), newBackupServer.getPort(), new DatagramSocket(),new byte[16384]);
+                            client.setDestination(newBackupServer.getAddress(), newBackupServer.getPort());
                             // change primary server value
                             client.bulkPut(ourPutPairs, self);
                         }
@@ -838,15 +839,15 @@ public class KVServerTaskHandler implements Runnable {
                             List<PutPair> putPairsOfNewAliveServer = getPutPairsOfPrimaryServer(serverRecord);
 
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut, and declare that we are one of their backup servers
-                            KVClient client = new KVClient(serverRecord.getAddress(), serverRecord.getPort(), new DatagramSocket(), new byte[16384]);
+                            client.setDestination(serverRecord.getAddress(), serverRecord.getPort());
                             client.bulkPut(putPairsOfNewAliveServer, null);
                             client.isBackup(self);
                         }
                     }
-                }
 
-                serverRingUpdated = true;
-                pendingRecordDeaths.add(serverRecord);
+                    serverRingUpdated = true;
+                    pendingRecordDeaths.add(serverRecord);
+                }
             }
             //the server update is about us
             else {
