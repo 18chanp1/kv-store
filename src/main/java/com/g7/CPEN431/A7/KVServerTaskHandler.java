@@ -62,6 +62,7 @@ public class KVServerTaskHandler implements Runnable {
     final private ConcurrentLinkedQueue<DatagramPacket> outbound;
     final private ConcurrentLinkedQueue<ServerRecord>pendingRecordDeaths;
     ExecutorService threadPool;
+    KVClient client;
 
     /* Constants */
     public final static int KEY_MAX_LEN = 32;
@@ -126,13 +127,14 @@ public class KVServerTaskHandler implements Runnable {
         this.pendingRecordDeaths = pendingRecordDeaths;
         this.threadPool = threadPool;
         this.lastReqTime = lastReqTime;
+        this.client = new KVClient(null, 0, new DatagramSocket(), new byte[16384]);
 
         //Initialize my backup servers
         serverRing.assignInitialBackupServers(self);
 
         //Let the backup servers know that we are the primary
         for (ServerRecord serverRecord : self.getMyBackupServers()) {
-            KVClient client = new KVClient(serverRecord.getAddress(), serverRecord.getPort(), new DatagramSocket(), new byte[16384]);
+            client.setDestination(serverRecord.getAddress(), serverRecord.getPort());
             client.isPrimary(self, self.getMyBackupServers());
         }
     }
@@ -572,8 +574,10 @@ public class KVServerTaskHandler implements Runnable {
         mapLock.readLock().unlock();
 
         ServerRecord primaryServer = serverRing.getServer(payload.getKey());
-        for (ServerRecord backup : self.getMyBackupServers()) {
-            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+
+        List<ServerRecord> serversToUpdate = (primaryServer == self) ? self.getMyBackupServers() : self.getBackupServersFor().get(primaryServer);
+        for (ServerRecord backup : serversToUpdate) {
+            client.setDestination(backup.getAddress(), backup.getPort());
             updateBackupServer(payload, client, primaryServer);
         }
 
@@ -597,7 +601,7 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
 
         for (ServerRecord backup : self.getMyBackupServers()) {
-            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+            client.setDestination(backup.getAddress(), backup.getPort());
             updateBackupServer(payload, client, null);
         }
 
@@ -721,8 +725,10 @@ public class KVServerTaskHandler implements Runnable {
         mapLock.readLock().unlock();
 
         ServerRecord primaryServer = serverRing.getServer(payload.getKey());
-        for (ServerRecord backup : self.getMyBackupServers()) {
-            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
+        List<ServerRecord> serversToUpdate = (primaryServer == self) ? self.getMyBackupServers() : self.getBackupServersFor().get(primaryServer);
+
+        for (ServerRecord backup : serversToUpdate) {
+            client.setDestination(backup.getAddress(), backup.getPort());
             updateBackupServer(payload, client, primaryServer);
         }
 
@@ -749,12 +755,6 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue res = scaf.setResponseType(WIPEOUT).build();
         DatagramPacket pkt = generateAndSend(res);
         mapLock.writeLock().unlock();
-
-        //TODO: check - supposedly not supposed to forward wipeout requests to backups
-//        for (ServerRecord backup : self.getMyBackupServers()) {
-//            KVClient client = new KVClient(backup.getAddress(), backup.getPort(), new DatagramSocket(),new byte[16384]);
-//            updateBackupServer(payload, client, null);
-//        }
 
         System.gc();
 
@@ -802,7 +802,6 @@ public class KVServerTaskHandler implements Runnable {
 
                     // if its news that a server is dead
                     if (server.getCode() == CODE_DED) {
-                        //TODO: temp removed: don't do anything if our backup servers are dead
 //                        /* check is dead server is one of out backup servers. if it is,
 //                       remove the dead server from our backup list, get a new backup server
 //                       and update our backup server list. also update the backupServerFor of the
@@ -831,7 +830,7 @@ public class KVServerTaskHandler implements Runnable {
                             List<PutPair> putPairsOfNewAliveServer = getPutPairsOfPrimaryServer(serverRecord);
 
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut, and declare that we are one of their backup servers
-                            KVClient client = new KVClient(serverRecord.getAddress(), serverRecord.getPort(), new DatagramSocket(), new byte[16384]);
+                            client.setDestination(serverRecord.getAddress(), serverRecord.getPort());
                             client.bulkPut(putPairsOfNewAliveServer, null);
 
                             //client.isBackup(self); //shouldn't need to announce this, the primary will know we are their replica
@@ -844,7 +843,7 @@ public class KVServerTaskHandler implements Runnable {
                             List<PutPair> putPairsOfNewAliveServer = getPutPairsOfPrimaryServer(us);
 
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut, and declare that we are their parent
-                            KVClient client = new KVClient(serverRecord.getAddress(), serverRecord.getPort(), new DatagramSocket(), new byte[16384]);
+                            client.setDestination(serverRecord.getAddress(), serverRecord.getPort());
                             client.bulkPut(putPairsOfNewAliveServer, us);
 
                             client.isPrimary(self, self.getMyBackupServers());

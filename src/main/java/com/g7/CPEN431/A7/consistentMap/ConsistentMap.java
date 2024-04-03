@@ -173,6 +173,9 @@ public class ConsistentMap {
      * Finds a server that is alive that can handle the request. I.e., if primary is down, returns a replica
      * @param key key for which we need to find a server to handle
      */
+
+    //TODO: this is for fixed mode where replicas are guaranteed to be the next 3 servers in the ring
+    // Change to look along the ring for available
     public ServerRecord findAvailableServer(byte[] key){
         for (ServerRecord replica: getNReplicas(key)){
             if (replica.isAlive()) {
@@ -443,6 +446,7 @@ public class ConsistentMap {
      * function that assigns backup servers for a primary server
      * @param self: the primary server
      */
+    //TODO: look along the ring until find 3 servers that have space (are not yet replicas for 3 other servers)
     public void assignInitialBackupServers(ServerRecord self){
         int replicationFactor = Math.min(getServerCount() - 1, REPLICATION_FACTOR - 1);
         /* assign servers until we have enough backup copies */
