@@ -8,9 +8,7 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class ServerRecord implements ServerEntry {
     private InetAddress address;
@@ -23,7 +21,9 @@ public class ServerRecord implements ServerEntry {
     private boolean informationTimeExists = false;
     private boolean updateCodeExists = false;
     private List<ServerRecord> myBackupServers;
-    private List<ServerRecord> backupServersFor;
+
+    //Stores 3 primary servers: list of its replicas including self
+    private Map<ServerRecord, List<ServerRecord>> backupServersFor;
     public final static int REPLICATION_FACTOR = 4;
     public final static int CODE_ALI = 0x1;
     public final static int CODE_DED = 0x2;
@@ -38,7 +38,7 @@ public class ServerRecord implements ServerEntry {
         this.updateCode = 1;
         this.updateCodeExists = true;
         this.myBackupServers = new ArrayList<>();
-        this.backupServersFor = new ArrayList<>();
+        this.backupServersFor = new HashMap<>();
     }
 
     /* Clone a ServerRecord */
@@ -182,11 +182,12 @@ public class ServerRecord implements ServerEntry {
     public void setMyBackupServers(List<ServerRecord> records){
         this.myBackupServers = records;
     }
-    public List<ServerRecord> getBackupServersFor(){
+    public Map<ServerRecord, List<ServerRecord>> getBackupServersFor(){
         return this.backupServersFor;
     }
-    public void setBackupServersFor(List<ServerRecord> records){
-        this.backupServersFor = records;
+    public void setBackupServersFor(ServerRecord primaryServer, List<ServerRecord> replicas){
+
+        this.backupServersFor.put(primaryServer, replicas);
     }
     public boolean isAlive()
     {

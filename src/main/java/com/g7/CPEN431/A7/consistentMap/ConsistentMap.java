@@ -69,12 +69,6 @@ public class ConsistentMap {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        /* Assumption: all servers in allRecords are alive during initialization
-         * Assign backup servers to all servers in allRecords */
-        for(ServerRecord record: allRecords.values()){
-            assignInitialBackupServers(record);
-        }
     }
 
 
@@ -173,6 +167,20 @@ public class ConsistentMap {
         lock.readLock().unlock();
 
         return server.getValue().getServerRecordClone();
+    }
+
+    /**
+     * Finds a server that is alive that can handle the request. I.e., if primary is down, returns a replica
+     * @param key key for which we need to find a server to handle
+     */
+    public ServerRecord findAvailableServer(byte[] key){
+        for (ServerRecord replica: getNReplicas(key)){
+            if (replica.isAlive()) {
+                return replica;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -353,33 +361,113 @@ public class ConsistentMap {
         return allServers;
     }
 
+    private ServerRecord getServerWithHashcode(int hashcode)
+    {
+        lock.readLock().lock();
+        Map.Entry<Integer, VNode> server = ring.ceilingEntry(hashcode);
+        /* Deal with case where the successor of the key is past "0" */
+        server = (server == null) ? ring.firstEntry(): server;
+        lock.readLock().unlock();
+
+        return server.getValue().serverRecord;
+    }
+
+    public List<ServerRecord> getNReplicas(byte[] key)
+    {
+        lock.readLock().lock();
+        if(ring.size() < REPLICATION_FACTOR * VNodes)
+        {
+            lock.readLock().unlock();
+            System.err.println("Insufficient servers in ring for replica");
+            throw new NoServersException();
+        }
+
+        List<ServerRecord> result = new ArrayList<>();
+        int hashcode = getHash(key);
+        Map.Entry<Integer, VNode> serverEntry = ring.ceilingEntry(hashcode);
+        /* Deal with case where the successor of the key is past "0" */
+        serverEntry = (serverEntry == null) ? ring.firstEntry(): serverEntry;
+
+        ServerRecord firstServer = serverEntry.getValue().serverRecord;
+
+        int serverCode = hashcode;
+        result.add(new ServerRecord(firstServer));
+
+
+        //add replicas
+        for(int i = 1; i < REPLICATION_FACTOR; i++)
+        {
+            ServerRecord curr;
+            do
+            {
+                serverCode++;
+                curr = getServerWithHashcode(serverCode);
+                serverCode = ring.ceilingEntry(serverCode) == null ? ring.firstEntry().getKey() : ring.ceilingEntry(serverCode).getKey();
+            } while(result.contains(curr));
+
+            //curr is now the subsequent replica
+            result.add(new ServerRecord(curr));
+        }
+
+        lock.readLock().unlock();
+        return result;
+    }
+
+    //TODO: please check correctness of this function
+    public List<ServerRecord> getNReplicas(int nReplicas)
+    {
+        lock.readLock().lock();
+
+        if(ring.size() < nReplicas * VNodes)
+        {
+            lock.readLock().unlock();
+            System.err.println("Insufficient servers in ring for replica");
+            throw new NoServersException();
+        }
+
+        List<ServerRecord> result = new ArrayList<>();
+
+        //add replicas
+        for(int i = 0; i < nReplicas; i++)
+        {
+            Map.Entry<Integer, VNode> server = ring.ceilingEntry(current);
+            server = (server == null) ? ring.firstEntry(): server;
+            result.add(new ServerRecord(server.getValue().serverRecord));
+        }
+
+        lock.readLock().unlock();
+        return result;
+    }
+
     /**
      * function that assigns backup servers for a primary server
      * @param self: the primary server
      */
-    private void assignInitialBackupServers(ServerRecord self){
-        List<ServerRecord> servers = new ArrayList<>();
-
+    public void assignInitialBackupServers(ServerRecord self){
         int replicationFactor = Math.min(getServerCount() - 1, REPLICATION_FACTOR - 1);
         /* assign servers until we have enough backup copies */
-        for (int i = 0; i < replicationFactor; i++) {
-            ServerRecord server = findBackupServer(servers, self);
-            // TODO: The value for this might need to get changed to optimize performance
-            /*
-             * under ideal scenarios, each server should only be the backup servers for REPLICATION_FACTOR - 1
-             * primary servers, performance degraded when random is not hitting on the exact server
-             * A server being a backup for too many primary servers may run into memory shortage issues
-             * Currently set to REPLICATION_FACTOR
-             */
-            servers.add(server);
 
-            List<ServerRecord> serverBackupFor = server.getBackupServersFor();
-            serverBackupFor.add(self);
-            server.setBackupServersFor(serverBackupFor);
-        }
-        self.setMyBackupServers(servers);
+        //TODO: switch back to random servers if conseq 3 doesn't work
+//        List<ServerRecord> servers = new ArrayList<>();
+//        for (int i = 0; i < replicationFactor; i++) {
+//            ServerRecord server = findBackupServer(servers, self);
+//            // TODO: The value for this might need to get changed to optimize performance
+//            /*
+//             * under ideal scenarios, each server should only be the backup servers for REPLICATION_FACTOR - 1
+//             * primary servers, performance degraded when random is not hitting on the exact server
+//             * A server being a backup for too many primary servers may run into memory shortage issues
+//             * Currently set to REPLICATION_FACTOR
+//             */
+//            servers.add(server);
+//
+//            List<ServerRecord> serverBackupFor = server.getBackupServersFor();
+//            serverBackupFor.add(self);
+//            server.setBackupServersFor(serverBackupFor);
+//        }
 
+        self.setMyBackupServers(getNReplicas(replicationFactor));
     }
+
     public ServerRecord findBackupServer(List<ServerRecord> currentBackupServers, ServerRecord self){
         Set<ServerRecord> servers = new HashSet<>(currentBackupServers);
         ServerRecord server;

@@ -1,5 +1,6 @@
 package com.g7.CPEN431.A7.wrappers;
 
+import com.g7.CPEN431.A7.consistentMap.ServerRecord;
 import com.g7.CPEN431.A7.newProto.KVRequest.KVRequest;
 import com.g7.CPEN431.A7.newProto.KVRequest.PutPair;
 import com.g7.CPEN431.A7.newProto.KVRequest.ServerEntry;
@@ -22,6 +23,7 @@ public class UnwrappedPayload implements KVRequest {
     private boolean versionExists = false;
     private ServerEntry primaryServer = null;
     private ServerEntry sender;
+    private List<ServerRecord> replicaServers;
 
     public UnwrappedPayload() {
     }
@@ -137,5 +139,13 @@ public class UnwrappedPayload implements KVRequest {
     @Override
     public void setPrimaryServer(ServerEntry primaryServer) {
         this.primaryServer = primaryServer;
+    }
+
+    public List<ServerRecord> getReplicaServers() {
+        return replicaServers;
+    }
+
+    public void setReplicaServers(List<ServerRecord> replicaServers) {
+        this.replicaServers = replicaServers;
     }
 }
