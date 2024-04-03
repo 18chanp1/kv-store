@@ -564,11 +564,15 @@ public class KVServerTaskHandler implements Runnable {
         } else {
             //redirect to primary server
             client.setDestination(primaryServer.getAddress(), primaryServer.getPort());
-            ServerResponse res = client.put(payload.getKey(), payload.getValue(), payload.getVersion());
-            if (res.getErrCode() == RES_CODE_SUCCESS) {
-                RequestCacheValue res1 = scaf.setResponseType(PUT).build();
-                pkt.set(generateAndSend(res1));
+            try {
+                client.put(payload.getKey(), payload.getValue(), payload.getVersion());
+                RequestCacheValue res = scaf.setResponseType(PUT).build();
+                pkt.set(generateAndSend(res));
+            } catch(KVClient.ServerTimedOutException e) {
+                RequestCacheValue res = scaf.setResponseType(TIMEOUT).build();
+                pkt.set(generateAndSend(res));
             }
+
         }
 
 
@@ -724,11 +728,16 @@ public class KVServerTaskHandler implements Runnable {
             }
         } else {
             client.setDestination(primaryServer.getAddress(), primaryServer.getPort());
-            ServerResponse res = client.delete(payload.getKey());
-            if (res.getErrCode() == RES_CODE_SUCCESS) {
-                RequestCacheValue res1 = scaf.setResponseType(DEL).build();
-                pkt.set(generateAndSend(res1));
+            try {
+                client.delete(payload.getKey());
+                RequestCacheValue res = scaf.setResponseType(DEL).build();
+                pkt.set(generateAndSend(res));
+            } catch (KVClient.ServerTimedOutException e) {
+                RequestCacheValue res = scaf.setResponseType(TIMEOUT).build();
+                pkt.set(generateAndSend(res));
             }
+
+
         }
 
 

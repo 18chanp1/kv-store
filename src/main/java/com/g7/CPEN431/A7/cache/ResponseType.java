@@ -19,5 +19,7 @@ public enum ResponseType {
     OVERLOAD_CACHE,
     OVERLOAD_THREAD,
     OBITUARIES,
-    IS_BACKUP
+    IS_BACKUP,
+
+    TIMEOUT,
 }
