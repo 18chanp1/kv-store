@@ -55,6 +55,7 @@ public class KeyTransferHandler extends TimerTask {
 
         mapLock.writeLock().lock();
 
+        transferPending.compareAndSet(true, false);
         Collection<ForwardList> toBeForwarded = serverRing.getEntriesToBeForwarded(this.map.entrySet());
 
 
@@ -115,6 +116,5 @@ public class KeyTransferHandler extends TimerTask {
 
 
         mapLock.writeLock().unlock();
-        transferPending.compareAndSet(true, false);
     }
 }

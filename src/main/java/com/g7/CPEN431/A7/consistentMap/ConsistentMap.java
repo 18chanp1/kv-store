@@ -31,7 +31,6 @@ public class ConsistentMap {
     private static final int MIN_UPDATE_PERIOD =  5000;
     Map<ServerRecord, ServerRecord> allRecords;
     private final int nReplicas;
-    private Set<ServerRecord> successors;
     boolean isLoopback = false;
 
 
@@ -73,8 +72,6 @@ public class ConsistentMap {
             throw new RuntimeException(e);
         }
 
-        //get myself
-        successors = getCurrentSuccessors();
     }
 
 
@@ -435,7 +432,9 @@ public class ConsistentMap {
         }
 
         Map<ServerRecord, ForwardList> m = new HashMap<>();
-        Set<ServerRecord> diff = getCurrentSuccessors();
+//        Set<ServerRecord> diff = getCurrentSuccessors();
+//        diff.remove(self);
+//        diff.remove(selfLoopback);
 
         entries.forEach((entry) ->
         {
@@ -443,46 +442,30 @@ public class ConsistentMap {
             function only uses the readlock, so it is fine.
              */
 
-
             /* forward keys for replica repair (I am main, and successors changed */
             byte[] pairKey = entry.getKey().getKey();
-            REPLICA_TYPE type = isReplica(pairKey);
+            List<ServerRecord> keyReplicas = getNReplicas(pairKey);
+            REPLICA_TYPE type = isReplica(keyReplicas);
+            keyReplicas.remove(self);
+            keyReplicas.remove(selfLoopback);
 
-            if (type == REPLICA_TYPE.UNRELATED)
+            //send it to all relevant personnel
+            for(ServerRecord replica: keyReplicas)
             {
-                ServerRecord prim = new ServerRecord(getServer(pairKey));
-                m.compute(getServer(pairKey), (k, v) ->
+                ServerRecord clone = new ServerRecord(replica);
+                m.compute(clone, (k, v) ->
                 {
                     ForwardList forwardList;
-                    if(v == null) forwardList = new ForwardList(prim);
+                    if(v == null) forwardList = new ForwardList(clone);
                     else forwardList = v;
 
-                    forwardList.addToList(entry, true);
+                    forwardList.addToList(entry, type == REPLICA_TYPE.UNRELATED);
 
                     return forwardList;
                 });
             }
-            else if(type == REPLICA_TYPE.PRIMARY)
-            {
-                for(ServerRecord diffServer : diff)
-                {
-                    ServerRecord clone = new ServerRecord(diffServer);
-                    m.compute(diffServer, (k, v) ->
-                    {
-                        ForwardList forwardList;
-                        if(v == null) forwardList = new ForwardList(clone);
-                        else forwardList = v;
-
-                        forwardList.addToList(entry, false);
-
-                        return forwardList;
-                    });
-                }
-            }
-
         });
 
-        successors = getCurrentSuccessors();
         lock.readLock().unlock();
         return m.values();
     }
