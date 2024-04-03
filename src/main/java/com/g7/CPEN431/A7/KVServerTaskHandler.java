@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.zip.CRC32;
 
 import static com.g7.CPEN431.A7.KVServer.*;
 import static com.g7.CPEN431.A7.cache.ResponseType.*;
@@ -50,7 +52,6 @@ public class KVServerTaskHandler implements Runnable {
     private final ConcurrentMap<KeyWrapper, ValueWrapper> map;
     private final ReadWriteLock mapLock;
     private boolean responseSent = false;
-    private PublicBuffer incomingPublicBuffer;
     /**
      * Consistent map is thread safe. (Internally synchronized with R/W lock)
      */
@@ -217,7 +218,7 @@ public class KVServerTaskHandler implements Runnable {
 
         UnwrappedPayload payload;
         try {
-            payload = unpackPayload(incomingPublicBuffer);
+            payload = unpackPayload(unwrappedMessage.getPayload());
         } catch (IOException e) {
             System.err.println("Unable to decode payload. Doing nothing");
             return;
@@ -277,8 +278,8 @@ public class KVServerTaskHandler implements Runnable {
                     unwrappedMessage.getCheckSum(),
                     unwrappedMessage.hasSourceAddress() ? InetAddress.getByAddress(unwrappedMessage.getSourceAddress()) : iPacket.getAddress(),
                     unwrappedMessage.hasSourcePort() ? unwrappedMessage.getSourcePort() : iPacket.getPort(),
-                    unwrappedMessage.getMessageID(),
-                    incomingPublicBuffer);
+                    unwrappedMessage.getMessageID()
+                    );
         } catch (UnknownHostException e) {
             System.err.println("Could not parse the forwarding address. Doing nothing");
             return;
@@ -367,10 +368,7 @@ public class KVServerTaskHandler implements Runnable {
     private UnwrappedMessage unpackPacket(DatagramPacket iPacket)
             throws IOException, InvalidChecksumException {
 
-        incomingPublicBuffer = new PublicBuffer(iPacket.getData(), PB_ContentType.PACKET, iPacket.getLength());
-
-        KVMsg deserialized = KVMsgSerializer.parseFrom(new KVMsgFactory(),
-                incomingPublicBuffer.readPacketFromPB());
+        KVMsg deserialized = KVMsgSerializer.parseFrom(new KVMsgFactory(), iPacket.getData(), 0, iPacket.getLength());
 
         if(!deserialized.hasMessageID() || !deserialized.hasPayload() || !deserialized.hasCheckSum())
         {
@@ -380,14 +378,24 @@ public class KVServerTaskHandler implements Runnable {
         byte[] id = deserialized.getMessageID();
         byte[] pl = deserialized.getPayload();
 
-        incomingPublicBuffer.writeIDToPB().write(id);
-        incomingPublicBuffer.writePayloadToPBAfterID().write(pl);
 
         //verify checksum
-        long actualCRC = incomingPublicBuffer.getCRCFromBody();
+        long actualCRC = getCRC(id, pl);
         if (actualCRC != deserialized.getCheckSum()) throw new InvalidChecksumException();
 
         return (UnwrappedMessage) deserialized;
+    }
+
+    public long getCRC(byte[] id, byte[] payload)
+    {
+        ByteBuffer buf = ByteBuffer.allocate(id.length + payload.length);
+        buf.put(id);
+        buf.put(payload);
+        buf.flip();
+
+        CRC32 crc32 = new CRC32();
+        crc32.update(buf.array());
+        return crc32.getValue();
     }
 
     /**
@@ -396,10 +404,10 @@ public class KVServerTaskHandler implements Runnable {
      * @return The unpacked object
      * @throws IOException If there was a problem unpacking it from the public buffer;
      */
-    private UnwrappedPayload unpackPayload(PublicBuffer payload) throws
+    private UnwrappedPayload unpackPayload(byte[] payload) throws
             IOException{
 
-        KVRequest deserialized = KVRequestSerializer.parseFrom(new KVRequestFactory(), payload.readPayloadFromPBBody());
+        KVRequest deserialized = KVRequestSerializer.parseFrom(new KVRequestFactory(), payload, 0, payload.length);
         return (UnwrappedPayload) deserialized;
     }
 

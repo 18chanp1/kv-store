@@ -5,13 +5,14 @@ import com.g7.CPEN431.A7.map.ValueWrapper;
 import com.g7.CPEN431.A7.newProto.KVMsg.KVMsgSerializer;
 import com.g7.CPEN431.A7.newProto.KVResponse.KVResponse;
 import com.g7.CPEN431.A7.newProto.KVResponse.KVResponseSerializer;
-import com.g7.CPEN431.A7.wrappers.PublicBuffer;
 import com.g7.CPEN431.A7.wrappers.UnwrappedMessage;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
+import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.zip.CRC32;
 
 public class RequestCacheValue implements KVResponse {
     private final ResponseType responseType;
@@ -24,7 +25,6 @@ public class RequestCacheValue implements KVResponse {
     private final long incomingCRC;
     private final InetAddress address;
     private final int port;
-    private final PublicBuffer pb;
     private List<Integer> serverStatusCodes;
 
     private RequestCacheValue(Builder builder) {
@@ -37,7 +37,6 @@ public class RequestCacheValue implements KVResponse {
         this.port = builder.b_port;
         this.reqID = builder.b_reqID;
         this.incomingCRC = builder.b_incomingCRC;
-        this.pb = builder.b_pb;
 
 
         switch (type) {
@@ -117,16 +116,14 @@ public class RequestCacheValue implements KVResponse {
         private final InetAddress b_address;
         private final int b_port;
         private final byte[] b_reqID;
-        private final PublicBuffer b_pb;
         private List<Integer> b_serverStatusCodes;
 
 
-        public Builder(long incomingCRC, InetAddress adr, int port, byte[] req_id, PublicBuffer pb) {
+        public Builder(long incomingCRC, InetAddress adr, int port, byte[] req_id)  {
             this.b_incomingCRC = incomingCRC;
             this.b_address = adr;
             this.b_port = port;
             this.b_reqID = req_id;
-            this.b_pb = pb;
         }
 
         public Builder setResponseType(ResponseType type) {
@@ -168,37 +165,34 @@ public class RequestCacheValue implements KVResponse {
 
     }
 
-    public PublicBuffer generatePayload() {
+    public byte[] generatePayload() {
         //first add the ID to the public buffer
-        try {
-            pb.writeIDToPB().write(reqID);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to write to public buffer");
-        }
 
-        KVResponseSerializer.serialize(this, pb.writePayloadToPBAfterID());
-
-        return pb;
+        return KVResponseSerializer.serialize(this);
     }
 
     public DatagramPacket generatePacket() {
         //prepare checksum
-        PublicBuffer pb = this.generatePayload();
-        long msgChecksum = pb.getCRCFromBody();
-
-        int pl_len = pb.getLenOfPayload();
+        byte[] pl = this.generatePayload();
+        long crc32 = getCRC(reqID, pl);
 
         byte[] fullMsg;
         //prepare message
-        try {
-            fullMsg = KVMsgSerializer.serialize(new UnwrappedMessage(reqID, pb.readPayloadFromPBBody().readNBytes(pl_len), msgChecksum));
+        fullMsg = KVMsgSerializer.serialize(new UnwrappedMessage(reqID, pl, crc32));
 
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to write to public buffer");
-        }
-
-        pb.returnBackingArrayAndClose();
         return new DatagramPacket(fullMsg, fullMsg.length, address, port);
+    }
+
+    public long getCRC(byte[] id, byte[] payload)
+    {
+        ByteBuffer buf = ByteBuffer.allocate(id.length + payload.length);
+        buf.put(id);
+        buf.put(payload);
+        buf.flip();
+
+        CRC32 crc32 = new CRC32();
+        crc32.update(buf.array());
+        return crc32.getValue();
     }
 
     @Override
