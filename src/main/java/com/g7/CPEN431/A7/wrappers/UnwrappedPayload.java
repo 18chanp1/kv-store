@@ -117,6 +117,10 @@ public class UnwrappedPayload implements KVRequest {
     public void setPutPair(List<PutPair> putPair) {
         this.bulkPutPair = putPair;
     }
+    @Override
+    public ServerEntry getPrimaryServer() {
+        return primaryServer;
+    }
 
     public ServerEntry getSender() {
         return sender;
@@ -128,5 +132,10 @@ public class UnwrappedPayload implements KVRequest {
 
     public boolean hasSender(){
         return this.sender != null;
+    }
+
+    @Override
+    public void setPrimaryServer(ServerEntry primaryServer) {
+        this.primaryServer = primaryServer;
     }
 }

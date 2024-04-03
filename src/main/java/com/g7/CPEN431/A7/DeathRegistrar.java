@@ -11,7 +11,6 @@ import java.net.DatagramSocket;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -26,16 +25,12 @@ public class DeathRegistrar extends TimerTask {
     KVClient sender;
     Random random;
     AtomicLong lastReqTime;
-    private AtomicBoolean waitingForIncomingTransfer;
 
     long previousPingSendTime;
     final static int SUSPENDED_THRESHOLD = 5000;
     final static int K = 10;
 
-    public DeathRegistrar(ConcurrentLinkedQueue<ServerRecord> pendingRecords,
-                          ConsistentMap ring,
-                          AtomicLong lastReqTime,
-                          AtomicBoolean waitingForIncomingTransfer)
+    public DeathRegistrar(ConcurrentLinkedQueue<ServerRecord> pendingRecords, ConsistentMap ring, AtomicLong lastReqTime)
     throws IOException {
         this.broadcastQueue = new HashMap<>();
         this.pendingRecords = pendingRecords;
@@ -44,7 +39,6 @@ public class DeathRegistrar extends TimerTask {
         this.random = new Random();
         this.previousPingSendTime = -1;
         this.lastReqTime = lastReqTime;
-        this.waitingForIncomingTransfer = waitingForIncomingTransfer;
     }
 
     @Override
@@ -196,10 +190,9 @@ public class DeathRegistrar extends TimerTask {
     private void checkSelfSuspended() {
         long currentTime = Instant.now().toEpochMilli();
         previousPingSendTime = previousPingSendTime == -1 ? currentTime : previousPingSendTime;
-        if (ring.getServerCount() != 1 && currentTime - lastReqTime.get() > GOSSIP_INTERVAL + SUSPENDED_THRESHOLD) {
+        if (ring.getServerCount() != 1 && currentTime - previousPingSendTime > GOSSIP_INTERVAL + SUSPENDED_THRESHOLD) {
             System.out.println("Suspension detected");
             // TODO: check for self loopback
-            waitingForIncomingTransfer.set(true);
             broadcastQueue.clear();
             self.setAliveAtTime(System.currentTimeMillis());
             ring.updateServerState(self);

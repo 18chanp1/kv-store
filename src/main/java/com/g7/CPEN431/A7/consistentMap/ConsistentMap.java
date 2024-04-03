@@ -13,7 +13,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.g7.CPEN431.A7.KVServer.self;
@@ -31,9 +33,6 @@ public class ConsistentMap {
     private String serverPathName;
     private static final int MIN_UPDATE_PERIOD =  5000;
     Map<ServerRecord, ServerRecord> allRecords;
-    private final int nReplicas;
-    private Set<ServerRecord> successors;
-    boolean isLoopback = false;
 
 
     /**
@@ -42,14 +41,12 @@ public class ConsistentMap {
      * @param serverPathName path to txt file containing server IP addresses + port
      * @throws IOException if cannot read txt file.
      */
-    public ConsistentMap(int vNodes, int nReplicas, String serverPathName) {
+    public ConsistentMap(int vNodes, String serverPathName) {
         this.ring = new TreeMap<>();
         this.VNodes = vNodes;
         this.lock = new ReentrantReadWriteLock();
         this.serverPathName = serverPathName;
         this.allRecords = new HashMap<>();
-        this.nReplicas = nReplicas;
-
 
         // Parse the txt file with all servers.
         Path path = Paths.get(serverPathName);
@@ -67,15 +64,17 @@ public class ConsistentMap {
                 if(serverRecord.equals(self) || serverRecord.equals(selfLoopback))
                 {
                     this.current = new VNode(self, 0).getHash() + 1;
-                    isLoopback = serverRecord.equals(selfLoopback);
                 }
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
-        //get myself
-        successors = getCurrentSuccessors();
+        /* Assumption: all servers in allRecords are alive during initialization
+         * Assign backup servers to all servers in allRecords */
+        for(ServerRecord record: allRecords.values()){
+            assignInitialBackupServers(record);
+        }
     }
 
 
@@ -123,147 +122,6 @@ public class ConsistentMap {
         lock.readLock().unlock();
 
         return server.getValue().getServerRecordClone();
-    }
-
-    /**
-     * Lock MUST be obtained prior to calling this function. Additionally,
-     * the ring must be checked beforehand to ensure there are sufficient amount
-     * of vnodes to return the actual value.
-     * @param hashcode - hashcode
-     * @return Actual serverRecord corresponding to the code
-     */
-    public ServerRecord getServerWithHashcode(int hashcode)
-    {
-        lock.readLock().lock();
-        Map.Entry<Integer, VNode> server = ring.ceilingEntry(hashcode);
-        /* Deal with case where the successor of the key is past "0" */
-        server = (server == null) ? ring.firstEntry(): server;
-        lock.readLock().unlock();
-
-        return server.getValue().serverRecord;
-    }
-
-    public List<ServerRecord> getNReplicas(byte[] key)
-    {
-        lock.readLock().lock();
-        if(ring.size() < nReplicas * VNodes)
-        {
-            lock.readLock().unlock();
-            System.err.println("Insufficient servers in ring for replica");
-            throw new NoServersException();
-        }
-
-        List<ServerRecord> result = new ArrayList<>();
-        int hashcode = getHash(key);
-        Map.Entry<Integer, VNode> serverEntry = ring.ceilingEntry(hashcode);
-        /* Deal with case where the successor of the key is past "0" */
-        serverEntry = (serverEntry == null) ? ring.firstEntry(): serverEntry;
-
-        ServerRecord firstServer = serverEntry.getValue().serverRecord;
-
-        int serverCode = hashcode;
-        result.add(new ServerRecord(firstServer));
-
-
-        //add replicas
-        for(int i = 1; i < nReplicas; i++)
-        {
-            ServerRecord curr;
-            do
-            {
-                serverCode++;
-                curr = getServerWithHashcode(serverCode);
-                serverCode = ring.ceilingEntry(serverCode) == null ? ring.firstEntry().getKey() : ring.ceilingEntry(serverCode).getKey();
-            } while(result.contains(curr));
-
-            //curr is now the subsequent replica
-            result.add(new ServerRecord(curr));
-        }
-
-        lock.readLock().unlock();
-        return result;
-    }
-
-    private List<ServerRecord> getNReplicaWithHashCode(int hashcode)
-    {
-        lock.readLock().lock();
-        if(ring.size() < nReplicas * VNodes)
-        {
-            lock.readLock().unlock();
-            System.err.println("Insufficient servers in ring for replica");
-            throw new NoServersException();
-        }
-
-        List<ServerRecord> result = new ArrayList<>();
-        Map.Entry<Integer, VNode> serverEntry = ring.ceilingEntry(hashcode);
-        /* Deal with case where the successor of the key is past "0" */
-        serverEntry = (serverEntry == null) ? ring.firstEntry(): serverEntry;
-
-        ServerRecord firstServer = serverEntry.getValue().serverRecord;
-
-        //add main's clone
-        int serverCode = hashcode;
-        result.add(new ServerRecord(firstServer));
-
-
-        //add replicas
-        for(int i = 1; i < nReplicas; i++)
-        {
-            ServerRecord curr;
-            do
-            {
-                serverCode++;
-                curr = getServerWithHashcode(serverCode);
-                serverCode = ring.ceilingEntry(serverCode) == null ? ring.firstEntry().getKey() : ring.ceilingEntry(serverCode).getKey();
-            } while(result.contains(curr));
-
-            //curr is now the subsequent replica
-            result.add(new ServerRecord(curr));
-        }
-
-        lock.readLock().unlock();
-        return result;
-    }
-
-    private Set<ServerRecord> getCurrentSuccessors()
-    {
-        Set<ServerRecord> successors = new HashSet<>();
-        for(int i = 0; i < VNodes; i++)
-        {
-            List<ServerRecord> successorsOfVnode = getNReplicaWithHashCode(new VNode(isLoopback ? selfLoopback: self, i).getHash());
-            successorsOfVnode.remove(0);
-            successors.addAll(successorsOfVnode);
-        }
-        return successors;
-    }
-
-    public REPLICA_TYPE isReplica(byte[] key)
-    {
-        List<ServerRecord> replicas = getNReplicas(key);
-
-        for(int i = 0; i < nReplicas; i++)
-        {
-            if(replicas.get(i).equals(self) || replicas.get(i).equals(selfLoopback))
-            {
-                return i == 0 ? REPLICA_TYPE.PRIMARY : REPLICA_TYPE.BACKUP;
-            }
-        }
-        return REPLICA_TYPE.UNRELATED;
-    }
-
-    public REPLICA_TYPE isReplica(List<ServerRecord> list)
-    {
-        assert list.size() == nReplicas;
-
-        for(int i = 0; i < nReplicas; i++)
-        {
-            if(list.get(i).equals(self) || list.get(i).equals(selfLoopback))
-            {
-                return i == 0 ? REPLICA_TYPE.PRIMARY : REPLICA_TYPE.BACKUP;
-            }
-        }
-        return REPLICA_TYPE.UNRELATED;
-
     }
 
     /**
@@ -347,7 +205,6 @@ public class ConsistentMap {
                     VNode v = new VNode(actualRecord, i);
                     ring.remove(v.getHash());
                 }
-                updated = true;
             }
             // resurrection
             else if (!actualRecord.isAlive() && r.isAlive())
@@ -357,7 +214,6 @@ public class ConsistentMap {
                     VNode v = new VNode(actualRecord, i);
                     ring.put(v.getHash(), v);
                 }
-                updated = true;
             }
             //otherwise, it must be in the same state, thus ring does not need to be changed.
 
@@ -365,6 +221,7 @@ public class ConsistentMap {
             actualRecord.setCode(r.getCode());
             actualRecord.setInformationTime(r.getInformationTime());
 
+            updated = true;
             System.out.println(getServerCount());
         }
         lock.writeLock().unlock();
@@ -440,7 +297,6 @@ public class ConsistentMap {
         }
 
         Map<ServerRecord, ForwardList> m = new HashMap<>();
-        Set<ServerRecord> diff = getCurrentSuccessors();
 
         entries.forEach((entry) ->
         {
@@ -448,48 +304,30 @@ public class ConsistentMap {
             function only uses the readlock, so it is fine.
              */
 
+            int hashcode = getHash(entry.getKey().getKey());
 
-            /* forward keys for replica repair (I am main, and successors changed */
-            byte[] pairKey = entry.getKey().getKey();
-            REPLICA_TYPE type = isReplica(pairKey);
-            if(type == REPLICA_TYPE.PRIMARY)
+            Map.Entry<Integer, VNode> server = ring.ceilingEntry(hashcode);
+            /* Deal with case where the successor of the key is past "0" */
+            server = (server == null) ? ring.firstEntry(): server;
+
+            /* Do not forward keys that belong to myself */
+            if(server.getValue().serverRecord.equals(self) || server.getValue().serverRecord.equals(selfLoopback)) return;
+
+            ServerRecord cloneRecord = server.getValue().getServerRecordClone();
+            m.compute(server.getValue().serverRecord, (key, value) ->
             {
-                for(ServerRecord diffServer : diff)
-                {
-                    ServerRecord clone = new ServerRecord(diffServer);
-                    m.compute(diffServer, (k, v) ->
-                    {
-                        ForwardList forwardList;
-                        if(v == null) forwardList = new ForwardList(clone);
-                        else forwardList = v;
+                ForwardList forwardList;
+                if(value == null) forwardList = new ForwardList(cloneRecord);
+                else forwardList = value;
 
-                        forwardList.addToList(entry, false);
+                forwardList.addToList(entry);
 
-                        return forwardList;
-                    });
-                }
-            }
-            else if (type == REPLICA_TYPE.UNRELATED)
-            {
-                ServerRecord prim = new ServerRecord(getServer(pairKey));
-                m.compute(getServer(pairKey), (k, v) ->
-                {
-                    ForwardList forwardList;
-                    if(v == null) forwardList = new ForwardList(prim);
-                    else forwardList = v;
-
-                    forwardList.addToList(entry, true);
-
-                    return forwardList;
-                });
-            }
+                return forwardList;
+            });
         });
-
-        successors = getCurrentSuccessors();
         lock.readLock().unlock();
         return m.values();
     }
-
 
     public Collection<ServerRecord> getAllRecords()
     {
@@ -637,14 +475,7 @@ public class ConsistentMap {
             );
         }
 
-    }
-
-    public static enum REPLICA_TYPE
-    {
-        PRIMARY,
-        BACKUP,
-        UNRELATED
-    }
+}
 
 }
 

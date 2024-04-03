@@ -10,10 +10,12 @@ public class ValueWrapper implements BytesMarshallable {
 
     private final byte[] value;
     private final int version;
+    private ServerEntry primaryServer;
 
-    public ValueWrapper(byte[] value, int version) {
+    public ValueWrapper(byte[] value, int version, ServerEntry primaryServer) {
         this.value = value;
         this.version = version;
+        this.primaryServer = primaryServer;
     }
     public byte[] getValue() {
         return value;
@@ -21,6 +23,9 @@ public class ValueWrapper implements BytesMarshallable {
 
     public int getVersion() {
         return version;
+    }
+    public ServerEntry getPrimaryServer(){
+        return primaryServer;
     }
 
     @Override
