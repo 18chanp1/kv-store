@@ -204,13 +204,13 @@ public class KVClient {
 
         return sendAndReceiveServerResponse(pl);
     }
-    public ServerResponse delete(byte[] key) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse delete(byte[] key, ServerRecord primaryServer) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         /* Generate isAlive Message */
         UnwrappedPayload pl = new UnwrappedPayload();
         pl.setCommand(REQ_CODE_DEL);
         pl.setKey(key);
-
-
+        pl.setPrimaryServer(primaryServer);
+        pl.setSender(new ServerRecord(this.serverAddress, this.serverPort));
         return sendAndReceiveServerResponse(pl);
     }
 

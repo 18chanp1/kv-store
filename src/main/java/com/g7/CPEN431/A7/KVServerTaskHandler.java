@@ -777,10 +777,25 @@ public class KVServerTaskHandler implements Runnable {
                 sender.setDestination(backup.getAddress(), backup.getPort());
                 updateBackupServer(payload, null);
             }
-        } else {
+        }
+        else if(primaryServer.equals(payload.getSender())){
+            map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
+                if (value == null) {
+                    RequestCacheValue res = scaf.setResponseType(NO_KEY).build();
+                    pkt.set(generateAndSend(res));
+                } else {
+                    bytesUsed.addAndGet(-value.getValue().length);
+                    RequestCacheValue res = scaf.setResponseType(DEL).build();
+                    pkt.set(generateAndSend(res));
+                }
+                return null;
+            });
+            mapLock.readLock().unlock();
+        }
+        else {
             sender.setDestination(primaryServer.getAddress(), primaryServer.getPort());
             try {
-                sender.delete(payload.getKey());
+                sender.delete(payload.getKey(), primaryServer);
                 RequestCacheValue res = scaf.setResponseType(DEL).build();
                 pkt.set(generateAndSend(res));
             } catch (KVClient.ServerTimedOutException e) {
@@ -937,7 +952,7 @@ public class KVServerTaskHandler implements Runnable {
                 case REQ_CODE_PUT:
                     sender.put(payload.getKey(), payload.getValue(), payload.getVersion(), primaryServer); break;
                 case REQ_CODE_DEL:
-                    sender.delete(payload.getKey()); break;
+                    sender.delete(payload.getKey(), primaryServer); break;
                 case REQ_CODE_WIP:
                     sender.wipeout();  break;
                 case REQ_CODE_BULKPUT:
