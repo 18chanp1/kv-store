@@ -101,7 +101,7 @@ public class UpdateBackupTest {
     }
     @Test
     public void updateBackupServersPut() throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
-        taskHandler.updateBackupServer(putPayload, mockClient, null);
+        taskHandler.updateBackupServer(putPayload, null);
         verify(mockClient, times(1)).put(eq(putPayload.getKey()), eq(putPayload.getValue()), eq(putPayload.getVersion()));
         verify(mockClient, times(0)).bulkPut(eq(bulkPutPayload.getPutPair()), eq(self));
         verify(mockClient, times(0)).delete(eq(deletePayload.getKey()));
@@ -110,7 +110,7 @@ public class UpdateBackupTest {
 
     @Test
     public void updateBackupServersBulkPut() throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
-        taskHandler.updateBackupServer(bulkPutPayload, mockClient, self);
+        taskHandler.updateBackupServer(bulkPutPayload, self);
         verify(mockClient, times(0)).put(eq(putPayload.getKey()), eq(putPayload.getValue()), eq(putPayload.getVersion()));
         verify(mockClient, times(1)).bulkPut(eq(bulkPutPayload.getPutPair()), eq(self));
         verify(mockClient, times(0)).delete(eq(deletePayload.getKey()));
@@ -119,7 +119,7 @@ public class UpdateBackupTest {
 
     @Test
     public void updateBackupServersDelete() throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
-        taskHandler.updateBackupServer(deletePayload, mockClient, null);
+        taskHandler.updateBackupServer(deletePayload, null);
         verify(mockClient, times(0)).put(eq(putPayload.getKey()), eq(putPayload.getValue()), eq(putPayload.getVersion()));
         verify(mockClient, times(0)).bulkPut(eq(bulkPutPayload.getPutPair()), eq(self));
         verify(mockClient, times(1)).delete(eq(deletePayload.getKey()));
@@ -128,7 +128,7 @@ public class UpdateBackupTest {
 
     @Test
     public void updateBackupServersWipeout() throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
-        taskHandler.updateBackupServer(wipeoutPayload, mockClient, null);
+        taskHandler.updateBackupServer(wipeoutPayload, null);
         verify(mockClient, times(0)).put(eq(putPayload.getKey()), eq(putPayload.getValue()), eq(putPayload.getVersion()));
         verify(mockClient, times(0)).bulkPut(eq(bulkPutPayload.getPutPair()), eq(self));
         verify(mockClient, times(0)).delete(eq(deletePayload.getKey()));
@@ -137,7 +137,7 @@ public class UpdateBackupTest {
 
     @Test
     public void updateBackupServersNonWriteOperation() throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
-        taskHandler.updateBackupServer(nonWritePayload, mockClient, null);
+        taskHandler.updateBackupServer(nonWritePayload, null);
         verify(mockClient, times(0)).isAlive();
     }
 }

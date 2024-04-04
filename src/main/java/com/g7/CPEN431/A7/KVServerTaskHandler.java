@@ -63,7 +63,7 @@ public class KVServerTaskHandler implements Runnable {
     final private ConcurrentLinkedQueue<DatagramPacket> outbound;
     final private ConcurrentLinkedQueue<ServerRecord>pendingRecordDeaths;
     ExecutorService threadPool;
-    KVClient client;
+    KVClient sender;
 
     /* Constants */
     public final static int KEY_MAX_LEN = 32;
@@ -129,14 +129,23 @@ public class KVServerTaskHandler implements Runnable {
         this.pendingRecordDeaths = pendingRecordDeaths;
         this.threadPool = threadPool;
         this.lastReqTime = lastReqTime;
-        this.client = new KVClient(null, 0, new DatagramSocket(),new byte[16384]);
+        this.sender = new KVClient(null, 0, new DatagramSocket(),new byte[16384]);
 
         //Server ring should have initialized my backup servers
         //Let the backup servers know that we are the primary
-        for (ServerRecord serverRecord : self.getMyBackupServers()) {
-            client.setDestination(serverRecord.getAddress(), serverRecord.getPort());
-            client.isPrimary(self);
+        for (int retry = 0; retry < 2; retry++) {
+            try {
+                for (ServerRecord serverRecord : self.getMyBackupServers()) {
+                    sender.setDestination(serverRecord.getAddress(), serverRecord.getPort());
+                    sender.isPrimary(self);
+                }
+                return;
+            } catch (KVClient.MissingValuesException e) {
+                System.out.println("Backup timed out while trying to notify them we are primary");
+                e.printStackTrace();
+            }
         }
+        System.out.println("Failed to notify backups that we are primary");
     }
 
     // empty constructor for testing DeathUpdateTest
@@ -573,14 +582,14 @@ public class KVServerTaskHandler implements Runnable {
             mapLock.readLock().unlock();
 
             for (ServerRecord backup : self.getMyBackupServers()) {
-                client.setDestination(backup.getAddress(), backup.getPort());
-                updateBackupServer(payload, client, primaryServer);
+                sender.setDestination(backup.getAddress(), backup.getPort());
+                updateBackupServer(payload, primaryServer);
             }
         } else {
             //redirect to primary server
-            client.setDestination(primaryServer.getAddress(), primaryServer.getPort());
+            sender.setDestination(primaryServer.getAddress(), primaryServer.getPort());
             try {
-                client.put(payload.getKey(), payload.getValue(), payload.getVersion());
+                sender.put(payload.getKey(), payload.getValue(), payload.getVersion());
                 RequestCacheValue res = scaf.setResponseType(PUT).build();
                 pkt.set(generateAndSend(res));
             } catch(KVClient.ServerTimedOutException e) {
@@ -611,8 +620,8 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
 
         for (ServerRecord backup : self.getMyBackupServers()) {
-            client.setDestination(backup.getAddress(), backup.getPort());
-            updateBackupServer(payload, client, null);
+            sender.setDestination(backup.getAddress(), backup.getPort());
+            updateBackupServer(payload, null);
         }
 
         return generateAndSend(res);
@@ -737,13 +746,13 @@ public class KVServerTaskHandler implements Runnable {
             });
             mapLock.readLock().unlock();
             for (ServerRecord backup : self.getMyBackupServers()) {
-                client.setDestination(backup.getAddress(), backup.getPort());
-                updateBackupServer(payload, client, null);
+                sender.setDestination(backup.getAddress(), backup.getPort());
+                updateBackupServer(payload, null);
             }
         } else {
-            client.setDestination(primaryServer.getAddress(), primaryServer.getPort());
+            sender.setDestination(primaryServer.getAddress(), primaryServer.getPort());
             try {
-                client.delete(payload.getKey());
+                sender.delete(payload.getKey());
                 RequestCacheValue res = scaf.setResponseType(DEL).build();
                 pkt.set(generateAndSend(res));
             } catch (KVClient.ServerTimedOutException e) {
@@ -834,9 +843,9 @@ public class KVServerTaskHandler implements Runnable {
                             List<PutPair> ourPutPairs = getOurPutPairs();
 
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut
-                            client.setDestination(newBackupServer.getAddress(), newBackupServer.getPort());
+                            sender.setDestination(newBackupServer.getAddress(), newBackupServer.getPort());
                             // change primary server value
-                            client.bulkPut(ourPutPairs, self);
+                            sender.bulkPut(ourPutPairs, self);
                         }
                     } else {
                         // news that a server that's not us is alive
@@ -847,9 +856,9 @@ public class KVServerTaskHandler implements Runnable {
                             List<PutPair> putPairsOfNewAliveServer = getPutPairsOfPrimaryServer(serverRecord);
 
                             // send the list of put pairs in our KVStore to the new backup server using bulkPut, and declare that we are one of their backup servers
-                            client.setDestination(serverRecord.getAddress(), serverRecord.getPort());
-                            client.bulkPut(putPairsOfNewAliveServer, null);
-                            client.isBackup(self);
+                            sender.setDestination(serverRecord.getAddress(), serverRecord.getPort());
+                            sender.bulkPut(putPairsOfNewAliveServer, null);
+                            sender.isBackup(self);
                         }
                     }
 
@@ -894,20 +903,19 @@ public class KVServerTaskHandler implements Runnable {
      * servers by using the client to send the change detailed in the payload.
      * For non-write operations (e.g. GET), does nothing.
      * @param payload The payload with the write operation (PUT, WIPEOUT, DELETE, BULKPUT)
-     * @param client The client to send the payload message to
      * @param primaryServer Optional. For bulk put operation
      */
-    public void updateBackupServer(UnwrappedPayload payload, KVClient client, ServerRecord primaryServer) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
+    public void updateBackupServer(UnwrappedPayload payload, ServerRecord primaryServer) throws KVClient.MissingValuesException, IOException, KVClient.ServerTimedOutException, InterruptedException {
             switch(payload.getCommand())
             {
                 case REQ_CODE_PUT:
-                    client.put(payload.getKey(), payload.getValue(), payload.getVersion()); break;
+                    sender.put(payload.getKey(), payload.getValue(), payload.getVersion()); break;
                 case REQ_CODE_DEL:
-                    client.delete(payload.getKey()); break;
+                    sender.delete(payload.getKey()); break;
                 case REQ_CODE_WIP:
-                    client.wipeout();  break;
+                    sender.wipeout();  break;
                 case REQ_CODE_BULKPUT:
-                    client.bulkPut(payload.getPutPair(), primaryServer); break;
+                    sender.bulkPut(payload.getPutPair(), primaryServer); break;
 
                 default: {
                     System.out.println("Req code " + payload.getCommand() + " received, doesn't require updating backups");
@@ -933,8 +941,8 @@ public class KVServerTaskHandler implements Runnable {
         us.setMyBackupServers(myBackupServers);
 
         // update serverBackupFor for the new backup server
-        client.setDestination(newBackupServer.getAddress(), newBackupServer.getPort());
-        client.isPrimary(us);
+        sender.setDestination(newBackupServer.getAddress(), newBackupServer.getPort());
+        sender.isPrimary(us);
 
         return newBackupServer;
     }
