@@ -570,7 +570,7 @@ public class KVServerTaskHandler implements Runnable {
         AtomicReference<DatagramPacket> pkt = new AtomicReference<>();
         ServerRecord primaryServer = (ServerRecord) payload.getPrimaryServer();
 
-        if (primaryServer.equals(self)) {
+        if (primaryServer == null) {
             //atomically put and respond, `tis thread safe.
             AtomicReference<IOException> ioexception= new AtomicReference<>();
             map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
@@ -732,7 +732,7 @@ public class KVServerTaskHandler implements Runnable {
         mapLock.readLock().lock();
         ServerRecord primaryServer = (ServerRecord) payload.getPrimaryServer();
 
-        if (primaryServer.equals(self)) {
+        if (primaryServer == null) {
             map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
                 if (value == null) {
                     RequestCacheValue res = scaf.setResponseType(NO_KEY).build();
