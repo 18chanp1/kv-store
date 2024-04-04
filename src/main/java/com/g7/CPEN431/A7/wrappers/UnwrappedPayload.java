@@ -21,7 +21,7 @@ public class UnwrappedPayload implements KVRequest {
     private boolean valueExists = false;
     private boolean versionExists = false;
     private ServerEntry primaryServer = null;
-    private ServerEntry sender;
+    private ServerEntry sender = null;
 
     public UnwrappedPayload() {
     }

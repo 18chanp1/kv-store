@@ -241,13 +241,15 @@ public class KVClient {
         return sendAndReceiveServerResponse(pl);
     }
 
-    public ServerResponse put(byte[] key, byte[] value, int version) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
+    public ServerResponse put(byte[] key, byte[] value, int version, ServerRecord primaryServer) throws IOException, ServerTimedOutException, MissingValuesException, InterruptedException {
         /* Generate isAlive Message */
         UnwrappedPayload pl = new UnwrappedPayload();
         pl.setCommand(REQ_CODE_PUT);
         pl.setKey(key);
         pl.setValue(value);
         pl.setVersion(version);
+        pl.setPrimaryServer(primaryServer);
+        pl.setSender(new ServerRecord(serverAddress, serverPort));
 
         return sendAndReceiveServerResponse(pl);
     }

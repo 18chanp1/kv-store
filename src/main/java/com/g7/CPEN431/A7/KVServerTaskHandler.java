@@ -583,13 +583,24 @@ public class KVServerTaskHandler implements Runnable {
 
             for (ServerRecord backup : self.getMyBackupServers()) {
                 sender.setDestination(backup.getAddress(), backup.getPort());
-                updateBackupServer(payload, primaryServer);
+                updateBackupServer(payload, self);
             }
-        } else {
+        }
+        else if(primaryServer.equals(payload.getSender())) {
+            AtomicReference<IOException> ioexception= new AtomicReference<>();
+            map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
+                RequestCacheValue res = scaf.setResponseType(PUT).build();
+                pkt.set(generateAndSend(res));
+                bytesUsed.addAndGet(payload.getValue().length);
+                return new ValueWrapper(payload.getValue(), payload.getVersion(), payload.getPrimaryServer());
+            });
+            mapLock.readLock().unlock();
+        }
+        else {
             //redirect to primary server
             sender.setDestination(primaryServer.getAddress(), primaryServer.getPort());
             try {
-                sender.put(payload.getKey(), payload.getValue(), payload.getVersion());
+                sender.put(payload.getKey(), payload.getValue(), payload.getVersion(), null);
                 RequestCacheValue res = scaf.setResponseType(PUT).build();
                 pkt.set(generateAndSend(res));
             } catch(KVClient.ServerTimedOutException e) {
@@ -909,7 +920,7 @@ public class KVServerTaskHandler implements Runnable {
             switch(payload.getCommand())
             {
                 case REQ_CODE_PUT:
-                    sender.put(payload.getKey(), payload.getValue(), payload.getVersion()); break;
+                    sender.put(payload.getKey(), payload.getValue(), payload.getVersion(), primaryServer); break;
                 case REQ_CODE_DEL:
                     sender.delete(payload.getKey()); break;
                 case REQ_CODE_WIP:
