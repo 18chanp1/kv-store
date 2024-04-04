@@ -72,9 +72,8 @@ public class ConsistentMap {
 
         /* Assumption: all servers in allRecords are alive during initialization
          * Assign backup servers to all servers in allRecords */
-        for(ServerRecord record: allRecords.values()){
-            assignInitialBackupServers(record);
-        }
+        assignInitialBackupServers(self);
+
     }
 
 

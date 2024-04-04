@@ -96,6 +96,8 @@ public class KVServerTaskHandler implements Runnable {
     public final static int REQ_CODE_MEM = 0X08;
     public final static int REQ_CODE_DED = 0x100;
     public final static int REQ_CODE_BKP = 0x101;
+    public final static int REQ_CODE_PRI = 0x102;
+
 
 
     public final static int STAT_CODE_OK = 0x00;
@@ -114,7 +116,7 @@ public class KVServerTaskHandler implements Runnable {
                                ConsistentMap serverRing,
                                ConcurrentLinkedQueue<ServerRecord> pendingRecordDeaths,
                                ExecutorService threadPool,
-                               AtomicLong lastReqTime) throws SocketException {
+                               AtomicLong lastReqTime) throws IOException, KVClient.MissingValuesException, KVClient.ServerTimedOutException, InterruptedException {
         this.iPacket = iPacket;
         this.requestCache = requestCache;
         this.map = map;
@@ -129,7 +131,12 @@ public class KVServerTaskHandler implements Runnable {
         this.lastReqTime = lastReqTime;
         this.client = new KVClient(null, 0, new DatagramSocket(),new byte[16384]);
 
-
+        //Server ring should have initialized my backup servers
+        //Let the backup servers know that we are the primary
+        for (ServerRecord serverRecord : self.getMyBackupServers()) {
+            client.setDestination(serverRecord.getAddress(), serverRecord.getPort());
+            client.isPrimary(self);
+        }
     }
 
     // empty constructor for testing DeathUpdateTest
@@ -344,6 +351,7 @@ public class KVServerTaskHandler implements Runnable {
             case REQ_CODE_DED: res = handleDeathUpdate(scaf, payload); break;
             case REQ_CODE_BULKPUT: res = handleBulkPut(scaf, payload); break;
             case REQ_CODE_BKP: res = handleIsBackup(scaf, payload); break;
+            case REQ_CODE_PRI: res = handleIsPrimary(scaf, payload); break;
 
             default: {
                 RequestCacheValue val = scaf.setResponseType(INVALID_OPCODE).build();
@@ -925,9 +933,8 @@ public class KVServerTaskHandler implements Runnable {
         us.setMyBackupServers(myBackupServers);
 
         // update serverBackupFor for the new backup server
-        List<ServerRecord> newServerBackupServerFor = newBackupServer.getBackupServersFor();
-        newServerBackupServerFor.add(us);
-        newBackupServer.setBackupServersFor(newServerBackupServerFor);
+        client.setDestination(newBackupServer.getAddress(), newBackupServer.getPort());
+        client.isPrimary(us);
 
         return newBackupServer;
     }
@@ -977,6 +984,19 @@ public class KVServerTaskHandler implements Runnable {
         backupServers.add((ServerRecord) payload.getSender());
         self.setMyBackupServers(backupServers);
         RequestCacheValue res = scaf.setResponseType(IS_BACKUP).build();
+        return generateAndSend(res);
+    }
+
+    private DatagramPacket handleIsPrimary(RequestCacheValue.Builder scaf, UnwrappedPayload payload){
+        if(!payload.hasSender()){
+            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            return generateAndSend(res);
+        }
+
+        List<ServerRecord> backupServersFor = self.getBackupServersFor();
+        backupServersFor.add((ServerRecord) payload.getSender());
+        self.setBackupServersFor(backupServersFor);
+        RequestCacheValue res = scaf.setResponseType(IS_PRIMARY).build();
         return generateAndSend(res);
     }
 
