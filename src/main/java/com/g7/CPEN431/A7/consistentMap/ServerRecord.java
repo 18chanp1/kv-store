@@ -22,8 +22,6 @@ public class ServerRecord implements ServerEntry {
     private boolean portExists = false;
     private boolean informationTimeExists = false;
     private boolean updateCodeExists = false;
-    private List<ServerRecord> myBackupServers;
-    private List<ServerRecord> backupServersFor;
     public final static int REPLICATION_FACTOR = 4;
     public final static int CODE_ALI = 0x1;
     public final static int CODE_DED = 0x2;
@@ -37,8 +35,6 @@ public class ServerRecord implements ServerEntry {
         this.informationTimeExists = true;
         this.updateCode = 1;
         this.updateCodeExists = true;
-        this.myBackupServers = new ArrayList<>();
-        this.backupServersFor = new ArrayList<>();
     }
 
     /* Clone a ServerRecord */
@@ -51,8 +47,6 @@ public class ServerRecord implements ServerEntry {
         this.informationTimeExists = r.informationTimeExists;
         this.updateCode = r.updateCode;
         this.updateCodeExists = r.updateCodeExists;
-        this.myBackupServers = r.myBackupServers;
-        this.backupServersFor = r.backupServersFor;
     }
 
 
@@ -176,18 +170,6 @@ public class ServerRecord implements ServerEntry {
         this.updateCodeExists = true;
     }
 
-    public List<ServerRecord> getMyBackupServers() {
-        return this.myBackupServers;
-    }
-    public void setMyBackupServers(List<ServerRecord> records){
-        this.myBackupServers = records;
-    }
-    public List<ServerRecord> getBackupServersFor(){
-        return this.backupServersFor;
-    }
-    public void setBackupServersFor(List<ServerRecord> records){
-        this.backupServersFor = records;
-    }
     public boolean isAlive()
     {
         return this.updateCode == CODE_ALI;

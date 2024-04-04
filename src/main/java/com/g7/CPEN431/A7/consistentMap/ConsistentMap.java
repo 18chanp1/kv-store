@@ -69,11 +69,6 @@ public class ConsistentMap {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        /* Assumption: all servers in allRecords are alive during initialization
-         * Assign backup servers to all servers in allRecords */
-        assignInitialBackupServers(self);
-
     }
 
 
@@ -356,13 +351,13 @@ public class ConsistentMap {
      * function that assigns backup servers for a primary server
      * @param self: the primary server
      */
-    private void assignInitialBackupServers(ServerRecord self){
-        List<ServerRecord> servers = new ArrayList<>();
+    public Set<ServerRecord> assignInitialBackupServers(ServerRecord self){
+        Set<ServerRecord> backupServers = new HashSet<>();
 
         int replicationFactor = Math.min(getServerCount() - 1, REPLICATION_FACTOR - 1);
         /* assign servers until we have enough backup copies */
         for (int i = 0; i < replicationFactor; i++) {
-            ServerRecord server = findBackupServer(servers, self);
+            ServerRecord server = findBackupServer(backupServers, self);
             // TODO: The value for this might need to get changed to optimize performance
             /*
              * under ideal scenarios, each server should only be the backup servers for REPLICATION_FACTOR - 1
@@ -370,24 +365,27 @@ public class ConsistentMap {
              * A server being a backup for too many primary servers may run into memory shortage issues
              * Currently set to REPLICATION_FACTOR
              */
-            servers.add(server);
+            backupServers.add(server);
 
-            List<ServerRecord> serverBackupFor = server.getBackupServersFor();
-            serverBackupFor.add(self);
-            server.setBackupServersFor(serverBackupFor);
+            //TODO: remove? local copy of serverBackupFor of other servers that are not us is not accurate
+//            List<ServerRecord> serverBackupFor = server.getBackupServersFor();
+//            serverBackupFor.add(self);
+//            server.setBackupServersFor(serverBackupFor);
         }
-        self.setMyBackupServers(servers);
-
+        return backupServers;
     }
-    public ServerRecord findBackupServer(List<ServerRecord> currentBackupServers, ServerRecord self){
+    public ServerRecord findBackupServer(Set<ServerRecord> currentBackupServers, ServerRecord self){
         Set<ServerRecord> servers = new HashSet<>(currentBackupServers);
         ServerRecord server;
         boolean isNew = false;
         do{
             server = getRandomServer();
-            if(server.getBackupServersFor().size() < REPLICATION_FACTOR && !server.equals(self)) {
-                isNew = servers.add(server);
-            }
+            isNew = (server != self) || servers.add(server);
+
+            //TODO: remove? again local copy of server.getBackupServersFor is inaccurate
+//            if(server.getBackupServersFor().size() < REPLICATION_FACTOR && !server.equals(self)) {
+//                isNew = servers.add(server);
+//            }
         } while(!isNew);
         return server;
     }
