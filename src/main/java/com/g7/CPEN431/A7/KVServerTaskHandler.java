@@ -592,7 +592,12 @@ public class KVServerTaskHandler implements Runnable {
 
             for (ServerRecord backup : myBackupServers) {
                 sender.setDestination(backup.getAddress(), backup.getPort());
-                updateBackupServer(payload, self);
+                try {
+                    updateBackupServer(payload, self);
+                }
+                catch (KVClient.ServerTimedOutException e){
+                    System.out.println("Timeout when " + self.getPort() + " is updating put" + backup.getServerPort());
+                }
             }
 
         //Primary is updating a replica server
@@ -775,7 +780,11 @@ public class KVServerTaskHandler implements Runnable {
             mapLock.readLock().unlock();
             for (ServerRecord backup : myBackupServers) {
                 sender.setDestination(backup.getAddress(), backup.getPort());
-                updateBackupServer(payload, null);
+                try {
+                    updateBackupServer(payload, null);
+                } catch(KVClient.ServerTimedOutException e){
+                    System.out.println("Timeout when " + self.getServerPort() + " is updating delete" + backup.getServerPort());
+                }
             }
         }
         else if(primaryServer.equals(payload.getSender())){
