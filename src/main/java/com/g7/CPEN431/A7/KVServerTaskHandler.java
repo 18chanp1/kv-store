@@ -559,6 +559,7 @@ public class KVServerTaskHandler implements Runnable {
 
         //We are the primary server
         if (primaryServer == null) {
+            System.out.println("null primary server in put");
             //atomically put and respond, `tis thread safe.
             AtomicReference<IOException> ioexception= new AtomicReference<>();
             map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
@@ -581,6 +582,7 @@ public class KVServerTaskHandler implements Runnable {
 
         //Primary is updating a replica server
         } else if(primaryServer.equals(payload.getSender())) {
+            System.out.println("put, primaryServer.equals(payload.getSender()), primary:" + primaryServer.getServerPort() + ", sender: " + payload.getSender().getServerPort());
             //Put this primary in our list of servers we are doing back up for
             List<ServerRecord> backupServerFor = self.getBackupServersFor();
             backupServerFor.add(primaryServer);
@@ -596,7 +598,7 @@ public class KVServerTaskHandler implements Runnable {
             mapLock.readLock().unlock();
         }
         else {
-            System.out.println("Non-primary server is handling a put request, smething is wrong");
+            System.out.println("Non-primary server is handling a put request, something is wrong");
             //redirect to primary server
             sender.setDestination(primaryServer.getAddress(), primaryServer.getPort());
             try {
@@ -749,6 +751,7 @@ public class KVServerTaskHandler implements Runnable {
         ServerRecord primaryServer = (ServerRecord) payload.getPrimaryServer();
 
         if (primaryServer == null) {
+            System.out.println("null primary server in delete");
             map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
                 if (value == null) {
                     RequestCacheValue res = scaf.setResponseType(NO_KEY).build();
@@ -771,6 +774,8 @@ public class KVServerTaskHandler implements Runnable {
             }
         }
         else if(primaryServer.equals(payload.getSender())){
+            System.out.println("delete, primaryServer.equals(payload.getSender()), primary:" + primaryServer.getServerPort() + ", sender: " + payload.getSender().getServerPort());
+
             map.compute(new KeyWrapper(payload.getKey()), (key, value) -> {
                 if (value == null) {
                     RequestCacheValue res = scaf.setResponseType(NO_KEY).build();
@@ -795,7 +800,6 @@ public class KVServerTaskHandler implements Runnable {
                 pkt.set(generateAndSend(res));
             }
         }
-
 
         return pkt.get();
     }
