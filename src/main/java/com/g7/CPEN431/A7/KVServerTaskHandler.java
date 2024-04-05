@@ -823,10 +823,12 @@ public class KVServerTaskHandler implements Runnable {
 
         //atomically wipe and respond
         mapLock.writeLock().lock();
-        map.clear();
-        bytesUsed.set(0); //concurrently correct, because we are only thread with access to map
         RequestCacheValue res = scaf.setResponseType(WIPEOUT).build();
         DatagramPacket pkt = generateAndSend(res);
+        map.clear();
+        bytesUsed.set(0); //concurrently correct, because we are only thread with access to map
+        // RequestCacheValue res = scaf.setResponseType(WIPEOUT).build();
+        // DatagramPacket pkt = generateAndSend(res);
         mapLock.writeLock().unlock();
 
         System.gc();
