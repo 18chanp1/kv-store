@@ -781,7 +781,7 @@ public class KVServerTaskHandler implements Runnable {
             for (ServerRecord backup : myBackupServers) {
                 sender.setDestination(backup.getAddress(), backup.getPort());
                 try {
-                    updateBackupServer(payload, null);
+                    updateBackupServer(payload, self);
                 } catch(KVClient.ServerTimedOutException e){
                     System.out.println("Timeout when " + self.getServerPort() + " is updating delete" + backup.getServerPort());
                 }
