@@ -26,6 +26,10 @@ public class ServerRecord implements ServerEntry {
     public final static int CODE_ALI = 0x1;
     public final static int CODE_DED = 0x2;
 
+    private List<ServerRecord> myBackupServers;
+    private List<ServerRecord> backupServersFor;
+
+
 
     public ServerRecord(InetAddress address, int port) {
         this.address = address;
@@ -35,6 +39,8 @@ public class ServerRecord implements ServerEntry {
         this.informationTimeExists = true;
         this.updateCode = 1;
         this.updateCodeExists = true;
+        this.myBackupServers = new ArrayList<>();
+        this.backupServersFor = new ArrayList<>();
     }
 
     /* Clone a ServerRecord */
@@ -47,6 +53,8 @@ public class ServerRecord implements ServerEntry {
         this.informationTimeExists = r.informationTimeExists;
         this.updateCode = r.updateCode;
         this.updateCodeExists = r.updateCodeExists;
+        this.myBackupServers = new ArrayList<>();
+        this.backupServersFor = new ArrayList<>();
     }
 
 
@@ -168,6 +176,19 @@ public class ServerRecord implements ServerEntry {
     public void setCode(int code) {
         this.updateCode = code;
         this.updateCodeExists = true;
+    }
+
+    public List<ServerRecord> getMyBackupServers() {
+        return this.myBackupServers;
+    }
+    public void setMyBackupServers(List<ServerRecord> records){
+        this.myBackupServers = records;
+    }
+    public List<ServerRecord> getBackupServersFor(){
+        return this.backupServersFor;
+    }
+    public void setBackupServersFor(List<ServerRecord> records){
+        this.backupServersFor = records;
     }
 
     public boolean isAlive()

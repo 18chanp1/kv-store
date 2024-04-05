@@ -69,6 +69,10 @@ public class ConsistentMap {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        /* Assumption: all servers in allRecords are alive during initialization
+         * Assign backup servers to us */
+        assignInitialBackupServers(self);
     }
 
 
@@ -351,8 +355,8 @@ public class ConsistentMap {
      * function that assigns backup servers for a primary server
      * @param self: the primary server
      */
-    public Set<ServerRecord> assignInitialBackupServers(ServerRecord self){
-        Set<ServerRecord> backupServers = new HashSet<>();
+    public List<ServerRecord> assignInitialBackupServers(ServerRecord self){
+        List<ServerRecord> backupServers = new ArrayList<>();
 
         int replicationFactor = Math.min(getServerCount() - 1, REPLICATION_FACTOR - 1);
         /* assign servers until we have enough backup copies */
@@ -366,26 +370,24 @@ public class ConsistentMap {
              * Currently set to REPLICATION_FACTOR
              */
             backupServers.add(server);
-
-            //TODO: remove? local copy of serverBackupFor of other servers that are not us is not accurate
-//            List<ServerRecord> serverBackupFor = server.getBackupServersFor();
-//            serverBackupFor.add(self);
-//            server.setBackupServersFor(serverBackupFor);
         }
+
+        self.setMyBackupServers(backupServers);
         return backupServers;
     }
-    public ServerRecord findBackupServer(Set<ServerRecord> currentBackupServers, ServerRecord self){
+
+    public ServerRecord findBackupServer(List<ServerRecord> currentBackupServers, ServerRecord self){
         Set<ServerRecord> servers = new HashSet<>(currentBackupServers);
         ServerRecord server;
         boolean isNew = false;
         do{
             server = getRandomServer();
-            isNew = (server != self) || servers.add(server);
+            //isNew = (server != self) || servers.add(server);
 
             //TODO: remove? again local copy of server.getBackupServersFor is inaccurate
-//            if(server.getBackupServersFor().size() < REPLICATION_FACTOR && !server.equals(self)) {
-//                isNew = servers.add(server);
-//            }
+            if (!server.equals(self)) {
+                isNew = servers.add(server);
+            }
         } while(!isNew);
         return server;
     }
