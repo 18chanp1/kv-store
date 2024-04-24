@@ -1,4 +1,4 @@
-package com.g7.CPEN431.A12.newProto.KVRequest;
+package com.g7.kvstore.A12.newProto.KVRequest;
 
 import java.util.Arrays;
 

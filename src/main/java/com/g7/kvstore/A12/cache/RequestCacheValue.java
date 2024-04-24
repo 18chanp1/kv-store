@@ -1,11 +1,11 @@
-package com.g7.CPEN431.A12.cache;
+package com.g7.kvstore.A12.cache;
 
-import com.g7.CPEN431.A12.KVServerTaskHandler;
-import com.g7.CPEN431.A12.map.ValueWrapper;
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsgSerializer;
-import com.g7.CPEN431.A12.newProto.KVResponse.KVResponse;
-import com.g7.CPEN431.A12.newProto.KVResponse.KVResponseSerializer;
-import com.g7.CPEN431.A12.wrappers.UnwrappedMessage;
+import com.g7.kvstore.A12.KVServerTaskHandler;
+import com.g7.kvstore.A12.map.ValueWrapper;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsgSerializer;
+import com.g7.kvstore.A12.newProto.KVResponse.KVResponse;
+import com.g7.kvstore.A12.newProto.KVResponse.KVResponseSerializer;
+import com.g7.kvstore.A12.wrappers.UnwrappedMessage;
 
 import java.net.DatagramPacket;
 import java.net.InetAddress;

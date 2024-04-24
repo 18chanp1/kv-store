@@ -1,6 +1,6 @@
-package com.g7.CPEN431.A12.consistentMap;
+package com.g7.kvstore.A12.consistentMap;
 
-import com.g7.CPEN431.A12.newProto.KVRequest.ServerEntry;
+import com.g7.kvstore.A12.newProto.KVRequest.ServerEntry;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

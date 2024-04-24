@@ -1,4 +1,4 @@
-package com.g7.CPEN431.A12.newProto.KVResponse;
+package com.g7.kvstore.A12.newProto.KVResponse;
 
 public interface KVResponse {
     boolean hasErrCode();

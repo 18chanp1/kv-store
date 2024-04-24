@@ -1,12 +1,12 @@
-package com.g7.CPEN431.A12;
+package com.g7.kvstore.A12;
 
-import com.g7.CPEN431.A12.client.KVClient;
-import com.g7.CPEN431.A12.client.ServerResponse;
-import com.g7.CPEN431.A12.consistentMap.ConsistentMap;
-import com.g7.CPEN431.A12.consistentMap.ServerRecord;
-import com.g7.CPEN431.A12.map.KeyWrapper;
-import com.g7.CPEN431.A12.map.ValueWrapper;
-import com.g7.CPEN431.A12.newProto.KVRequest.ServerEntry;
+import com.g7.kvstore.A12.client.KVClient;
+import com.g7.kvstore.A12.client.ServerResponse;
+import com.g7.kvstore.A12.consistentMap.ConsistentMap;
+import com.g7.kvstore.A12.consistentMap.ServerRecord;
+import com.g7.kvstore.A12.map.KeyWrapper;
+import com.g7.kvstore.A12.map.ValueWrapper;
+import com.g7.kvstore.A12.newProto.KVRequest.ServerEntry;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 
-import static com.g7.CPEN431.A12.KVServer.*;
+import static com.g7.kvstore.A12.KVServer.*;
 
 public class DeathRegistrar extends TimerTask {
     Map<ServerRecord, ServerRecord> broadcastQueue;

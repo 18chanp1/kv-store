@@ -1,18 +1,16 @@
-package com.g7.CPEN431.A12;
+package com.g7.kvstore.A12;
 
-import com.g7.CPEN431.A12.client.KVClient;
-import com.g7.CPEN431.A12.consistentMap.ForwardList;
-import com.g7.CPEN431.A12.consistentMap.ServerRecord;
-import com.g7.CPEN431.A12.newProto.KVRequest.KVPair;
-import com.g7.CPEN431.A12.newProto.KVRequest.PutPair;
+import com.g7.kvstore.A12.client.KVClient;
+import com.g7.kvstore.A12.consistentMap.ForwardList;
+import com.g7.kvstore.A12.consistentMap.ServerRecord;
+import com.g7.kvstore.A12.newProto.KVRequest.KVPair;
+import com.g7.kvstore.A12.newProto.KVRequest.PutPair;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
-
-import static com.g7.CPEN431.A12.KVServer.BULKPUT_MAX_SZ;
 
 public class RawPutHandler implements Callable<RawPutHandler.RESULT> {
     ForwardList forwardInstructions;
@@ -48,7 +46,7 @@ public class RawPutHandler implements Callable<RawPutHandler.RESULT> {
                 pairLen += Integer.BYTES;
 
                 //clear the outgoing buffer and send the packet
-                if (currPacketSize + pairLen >= BULKPUT_MAX_SZ) {
+                if (currPacketSize + pairLen >= KVServer.BULKPUT_MAX_SZ) {
                     client.setDestination(target.getAddress(), target.getPort());
 
                     client.bulkPutPump(temp);

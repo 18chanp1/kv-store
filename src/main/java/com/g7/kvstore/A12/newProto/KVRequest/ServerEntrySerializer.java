@@ -1,9 +1,9 @@
-package com.g7.CPEN431.A12.newProto.KVRequest;
+package com.g7.kvstore.A12.newProto.KVRequest;
 
-import com.g7.CPEN431.A12.newProto.shared.CurrentCursor;
-import com.g7.CPEN431.A12.newProto.shared.MessageFactory;
-import com.g7.CPEN431.A12.newProto.shared.ProtobufInputStream;
-import com.g7.CPEN431.A12.newProto.shared.ProtobufOutputStream;
+import com.g7.kvstore.A12.newProto.shared.CurrentCursor;
+import com.g7.kvstore.A12.newProto.shared.MessageFactory;
+import com.g7.kvstore.A12.newProto.shared.ProtobufInputStream;
+import com.g7.kvstore.A12.newProto.shared.ProtobufOutputStream;
 
 public final class ServerEntrySerializer {
 public static byte[] serialize(ServerEntry message) {

@@ -1,13 +1,13 @@
-package com.g7.CPEN431.A12;
+package com.g7.kvstore.A12;
 
-import com.g7.CPEN431.A12.client.KVClient;
-import com.g7.CPEN431.A12.consistentMap.ConsistentMap;
-import com.g7.CPEN431.A12.consistentMap.ForwardList;
-import com.g7.CPEN431.A12.consistentMap.ServerRecord;
-import com.g7.CPEN431.A12.map.KeyWrapper;
-import com.g7.CPEN431.A12.map.ValueWrapper;
-import com.g7.CPEN431.A12.newProto.KVRequest.KVPair;
-import com.g7.CPEN431.A12.newProto.KVRequest.PutPair;
+import com.g7.kvstore.A12.client.KVClient;
+import com.g7.kvstore.A12.consistentMap.ConsistentMap;
+import com.g7.kvstore.A12.consistentMap.ForwardList;
+import com.g7.kvstore.A12.consistentMap.ServerRecord;
+import com.g7.kvstore.A12.map.KeyWrapper;
+import com.g7.kvstore.A12.map.ValueWrapper;
+import com.g7.kvstore.A12.newProto.KVRequest.KVPair;
+import com.g7.kvstore.A12.newProto.KVRequest.PutPair;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -20,9 +20,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
-
-import static com.g7.CPEN431.A12.KVServer.BULKPUT_MAX_SZ;
-import static com.g7.CPEN431.A12.KVServer.self;
 
 public class KeyTransferHandler  extends TimerTask{
     ReadWriteLock mapLock;
@@ -52,7 +49,7 @@ public class KeyTransferHandler  extends TimerTask{
 
 
     private void transferKeys() {
-        System.out.println("Starting key transfer. @" + self.getPort());
+        System.out.println("Starting key transfer. @" + KVServer.self.getPort());
 
         mapLock.writeLock().lock();
 
@@ -83,7 +80,7 @@ public class KeyTransferHandler  extends TimerTask{
                     int pairLen = pair.getKey().length + pair.getValue().length + Integer.BYTES;
 
                     //clear the outgoing buffer and send the packet
-                    if(currPacketSize + pairLen >= BULKPUT_MAX_SZ)
+                    if(currPacketSize + pairLen >= KVServer.BULKPUT_MAX_SZ)
                     {
                         byte[] pairs = KVClient.bulkPutPumpStatic(temp);
                         DatagramPacket p = new DatagramPacket(pairs, pairs.length, target.getAddress(), target.getPort());
@@ -122,7 +119,7 @@ public class KeyTransferHandler  extends TimerTask{
             if(v != null) bytesUsed.addAndGet(-v.getValue().length);
         });
 
-        System.out.println("ending key transfer. @" + self.getPort());
+        System.out.println("ending key transfer. @" + KVServer.self.getPort());
 
     }
 }

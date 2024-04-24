@@ -1,10 +1,10 @@
-package com.g7.CPEN431.A12;
+package com.g7.kvstore.A12;
 
-import com.g7.CPEN431.A12.cache.RequestCacheKey;
-import com.g7.CPEN431.A12.consistentMap.ConsistentMap;
-import com.g7.CPEN431.A12.consistentMap.ServerRecord;
-import com.g7.CPEN431.A12.map.KeyWrapper;
-import com.g7.CPEN431.A12.map.ValueWrapper;
+import com.g7.kvstore.A12.cache.RequestCacheKey;
+import com.g7.kvstore.A12.consistentMap.ConsistentMap;
+import com.g7.kvstore.A12.consistentMap.ServerRecord;
+import com.g7.kvstore.A12.map.KeyWrapper;
+import com.g7.kvstore.A12.map.ValueWrapper;
 import com.google.common.cache.Cache;
 
 import java.io.IOException;

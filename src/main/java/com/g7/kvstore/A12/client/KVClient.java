@@ -1,15 +1,15 @@
-package com.g7.CPEN431.A12.client;
+package com.g7.kvstore.A12.client;
 
 
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsgFactory;
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsgSerializer;
-import com.g7.CPEN431.A12.newProto.KVRequest.KVRequestSerializer;
-import com.g7.CPEN431.A12.newProto.KVRequest.PutPair;
-import com.g7.CPEN431.A12.newProto.KVRequest.ServerEntry;
-import com.g7.CPEN431.A12.newProto.KVResponse.KVResponseSerializer;
-import com.g7.CPEN431.A12.newProto.KVResponse.ServerResponseFactory;
-import com.g7.CPEN431.A12.wrappers.UnwrappedMessage;
-import com.g7.CPEN431.A12.wrappers.UnwrappedPayload;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsgFactory;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsgSerializer;
+import com.g7.kvstore.A12.newProto.KVRequest.KVRequestSerializer;
+import com.g7.kvstore.A12.newProto.KVRequest.PutPair;
+import com.g7.kvstore.A12.newProto.KVRequest.ServerEntry;
+import com.g7.kvstore.A12.newProto.KVResponse.KVResponseSerializer;
+import com.g7.kvstore.A12.newProto.KVResponse.ServerResponseFactory;
+import com.g7.kvstore.A12.wrappers.UnwrappedMessage;
+import com.g7.kvstore.A12.wrappers.UnwrappedPayload;
 
 import java.io.IOException;
 import java.net.*;
@@ -21,7 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.zip.CRC32;
 
-import static com.g7.CPEN431.A12.KVServer.self;
+import static com.g7.kvstore.A12.KVServer.self;
 
 public class KVClient {
     private InetAddress serverAddress;

@@ -1,4 +1,4 @@
-# Something about the A12
+# Something about the store 
 Used Run Command:
 ``` shell
 java -Xmx512m \

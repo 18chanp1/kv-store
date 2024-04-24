@@ -1,8 +1,8 @@
-package com.g7.CPEN431.A12.wrappers;
+package com.g7.kvstore.A12.wrappers;
 
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsg;
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsgSerializer;
-import com.g7.CPEN431.A12.consistentMap.ServerRecord;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsg;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsgSerializer;
+import com.g7.kvstore.A12.consistentMap.ServerRecord;
 
 import java.net.DatagramPacket;
 import java.net.InetAddress;

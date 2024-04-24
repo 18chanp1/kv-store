@@ -1,4 +1,4 @@
-package com.g7.CPEN431.A12.tests;
+package com.g7.kvstore.A12.tests;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

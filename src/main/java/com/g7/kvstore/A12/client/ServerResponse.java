@@ -1,7 +1,7 @@
-package com.g7.CPEN431.A12.client;
+package com.g7.kvstore.A12.client;
 
 
-import com.g7.CPEN431.A12.newProto.KVResponse.KVResponse;
+import com.g7.kvstore.A12.newProto.KVResponse.KVResponse;
 
 import java.util.List;
 

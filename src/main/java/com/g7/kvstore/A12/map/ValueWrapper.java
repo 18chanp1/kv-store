@@ -1,4 +1,4 @@
-package com.g7.CPEN431.A12.map;
+package com.g7.kvstore.A12.map;
 
 import net.openhft.chronicle.bytes.BytesMarshallable;
 

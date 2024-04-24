@@ -1,4 +1,4 @@
-package com.g7.CPEN431.A12.newProto.shared;
+package com.g7.kvstore.A12.newProto.shared;
 
 
 import java.io.IOException;

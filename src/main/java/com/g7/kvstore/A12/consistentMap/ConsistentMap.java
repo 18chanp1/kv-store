@@ -1,8 +1,8 @@
-package com.g7.CPEN431.A12.consistentMap;
+package com.g7.kvstore.A12.consistentMap;
 
-import com.g7.CPEN431.A12.map.KeyWrapper;
-import com.g7.CPEN431.A12.map.ValueWrapper;
-import com.g7.CPEN431.A12.newProto.KVRequest.ServerEntry;
+import com.g7.kvstore.A12.map.KeyWrapper;
+import com.g7.kvstore.A12.map.ValueWrapper;
+import com.g7.kvstore.A12.newProto.KVRequest.ServerEntry;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -17,7 +17,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static com.g7.CPEN431.A12.KVServer.*;
+import static com.g7.kvstore.A12.KVServer.*;
 
 /**
  * A map API for a consistent hashing scheme.

@@ -1,7 +1,7 @@
-package com.g7.CPEN431.A12.newProto.KVMsg;
+package com.g7.kvstore.A12.newProto.KVMsg;
 
-import com.g7.CPEN431.A12.newProto.shared.MessageFactory;
-import com.g7.CPEN431.A12.wrappers.UnwrappedMessage;
+import com.g7.kvstore.A12.newProto.shared.MessageFactory;
+import com.g7.kvstore.A12.wrappers.UnwrappedMessage;
 
 public class KVMsgFactory implements MessageFactory {
 

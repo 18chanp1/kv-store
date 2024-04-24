@@ -1,18 +1,20 @@
-package com.g7.CPEN431.A12;
+package com.g7.kvstore.A12;
 
-import com.g7.CPEN431.A12.cache.RequestCacheKey;
-import com.g7.CPEN431.A12.cache.RequestCacheValue;
-import com.g7.CPEN431.A12.client.KVClient;
-import com.g7.CPEN431.A12.consistentMap.ConsistentMap;
-import com.g7.CPEN431.A12.consistentMap.ServerRecord;
-import com.g7.CPEN431.A12.map.KeyWrapper;
-import com.g7.CPEN431.A12.map.ValueWrapper;
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsg;
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsgFactory;
-import com.g7.CPEN431.A12.newProto.KVMsg.KVMsgSerializer;
+import com.g7.kvstore.A12.cache.RequestCacheKey;
+import com.g7.kvstore.A12.cache.RequestCacheValue;
+import com.g7.kvstore.A12.client.KVClient;
+import com.g7.kvstore.A12.consistentMap.ConsistentMap;
+import com.g7.kvstore.A12.consistentMap.ServerRecord;
+import com.g7.kvstore.A12.map.KeyWrapper;
+import com.g7.kvstore.A12.map.ValueWrapper;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsg;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsgFactory;
+import com.g7.kvstore.A12.newProto.KVMsg.KVMsgSerializer;
 import com.g7.CPEN431.A12.newProto.KVRequest.*;
-import com.g7.CPEN431.A12.wrappers.UnwrappedMessage;
-import com.g7.CPEN431.A12.wrappers.UnwrappedPayload;
+import com.g7.kvstore.A12.wrappers.UnwrappedMessage;
+import com.g7.kvstore.A12.wrappers.UnwrappedPayload;
+import com.g7.kvstore.A12.cache.ResponseType;
+import com.g7.kvstore.A12.newProto.KVRequest.*;
 import com.google.common.cache.Cache;
 
 import java.io.IOException;
@@ -27,9 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.zip.CRC32;
 
-import static com.g7.CPEN431.A12.KVServer.*;
-import static com.g7.CPEN431.A12.cache.ResponseType.*;
-import static com.g7.CPEN431.A12.consistentMap.ServerRecord.CODE_DED;
+import static com.g7.kvstore.A12.KVServer.*;
 
 public class KVServerTaskHandler implements Runnable {
     /* Thread parameters */
@@ -323,7 +323,7 @@ public class KVServerTaskHandler implements Runnable {
         if(isOverloaded) {
             System.out.println("Cache overflow. Delay Requested");
             RequestCacheValue res = scaf
-                    .setResponseType(OVERLOAD_THREAD)
+                    .setResponseType(ResponseType.OVERLOAD_THREAD)
                     .build();
             return generateAndSend(res);
         }
@@ -344,7 +344,7 @@ public class KVServerTaskHandler implements Runnable {
             case REQ_CODE_BULKPUT: res = handleBulkPut(scaf, payload); break;
 
             default: {
-                RequestCacheValue val = scaf.setResponseType(INVALID_OPCODE).build();
+                RequestCacheValue val = scaf.setResponseType(ResponseType.INVALID_OPCODE).build();
                 res =  generateAndSend(val);
             }
         }
@@ -446,12 +446,12 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handleGetMembershipCount(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if(payload.hasValue() || payload.hasVersion() || payload.hasKey())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
         RequestCacheValue res = scaf
-                .setResponseType(MEMBERSHIP_COUNT)
+                .setResponseType(ResponseType.MEMBERSHIP_COUNT)
                 .setMembershipCount(serverRing.getServerCount())
                 .build();
 
@@ -467,13 +467,13 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handleGetPID(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if(payload.hasValue() || payload.hasVersion() || payload.hasKey())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
         long pid = ProcessHandle.current().pid();
         RequestCacheValue res = scaf
-                .setResponseType(PID)
+                .setResponseType(ResponseType.PID)
                 .setPID(pid)
                 .build();
 
@@ -490,11 +490,11 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handleIsAlive(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if(payload.hasValue() || payload.hasVersion() || payload.hasKey())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
-        RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
+        RequestCacheValue res = scaf.setResponseType(ResponseType.ISALIVE).build();
         return generateAndSend(res);
     }
 
@@ -530,26 +530,26 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handlePut(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if(!payload.hasKey() || !payload.hasValue())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
         //defensive design to reject 0 length keys
         if(payload.getKey().length == 0 || payload.getKey().length > KEY_MAX_LEN)
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_KEY).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_KEY).build();
             return generateAndSend(res);
         }
 
         if(payload.getValue().length > VALUE_MAX_LEN)
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_VALUE).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_VALUE).build();
             return generateAndSend(res);
         }
 
         if(bytesUsed.get() >= MAP_SZ) {
             System.out.println("clearing memory");
-            RequestCacheValue res = scaf.setResponseType(NO_MEM).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.NO_MEM).build();
             //TODO UNSAFE, but shitty client so whatever...
             mapLock.writeLock().lock();
             map.clear();
@@ -564,7 +564,7 @@ public class KVServerTaskHandler implements Runnable {
 
         if(!forwardOK)
         {
-            RequestCacheValue res = scaf.setResponseType(OVERLOAD_CACHE).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.OVERLOAD_CACHE).build();
             return generateAndSend(res);
         }
 
@@ -578,7 +578,7 @@ public class KVServerTaskHandler implements Runnable {
         if(old != null) bytesUsed.addAndGet(old.getValue().length);
         mapLock.readLock().unlock();
 
-        RequestCacheValue res = scaf.setResponseType(PUT).build();
+        RequestCacheValue res = scaf.setResponseType(ResponseType.PUT).build();
         return generateAndSend(res);
     }
 
@@ -640,14 +640,14 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handleBulkPut (RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if(!payload.hasPutPair())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
 
 
         bulkPutHelper(payload.getPutPair());
-        RequestCacheValue res = scaf.setResponseType(ISALIVE).build();
+        RequestCacheValue res = scaf.setResponseType(ResponseType.ISALIVE).build();
         return generateAndSend(res);
     }
 
@@ -714,14 +714,14 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handleGet(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if((!payload.hasKey()) || payload.hasValue() || payload.hasVersion())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
         //defensive design to reject 0 length keys
         if(payload.getKey().length == 0 || payload.getKey().length > KEY_MAX_LEN)
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_KEY).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_KEY).build();
             return generateAndSend(res);
         }
 
@@ -733,10 +733,10 @@ public class KVServerTaskHandler implements Runnable {
 
         RequestCacheValue res;
         if (v == null) {
-            res = scaf.setResponseType(NO_KEY).build();
+            res = scaf.setResponseType(ResponseType.NO_KEY).build();
         } else {
             res = scaf
-                    .setResponseType(VALUE)
+                    .setResponseType(ResponseType.VALUE)
                     .setValue(v)
                     .build();
         }
@@ -752,21 +752,21 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handleDelete(RequestCacheValue.Builder scaf, UnwrappedPayload payload) {
         if((!payload.hasKey()) || payload.hasValue() || payload.hasVersion())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
         //defensive design to reject 0 length keys
         if(payload.getKey().length == 0 || payload.getKey().length > KEY_MAX_LEN)
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_KEY).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_KEY).build();
             return generateAndSend(res);
         }
 
         boolean forwardOK = forwardToReplica(payload, System.currentTimeMillis());
         if(!forwardOK)
         {
-            RequestCacheValue res = scaf.setResponseType(OVERLOAD_THREAD).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.OVERLOAD_THREAD).build();
             return generateAndSend(res);
         }
 
@@ -779,10 +779,10 @@ public class KVServerTaskHandler implements Runnable {
         RequestCacheValue res;
 
         if (v == null) {
-            res = scaf.setResponseType(NO_KEY).build();
+            res = scaf.setResponseType(ResponseType.NO_KEY).build();
         } else {
             bytesUsed.addAndGet(-v.getValue().length);
-            res = scaf.setResponseType(DEL).build();
+            res = scaf.setResponseType(ResponseType.DEL).build();
         }
 
         return generateAndSend(res);
@@ -797,7 +797,7 @@ public class KVServerTaskHandler implements Runnable {
     private DatagramPacket handleWipeout(RequestCacheValue.Builder scaf, UnwrappedPayload payload){
         if(payload.hasValue() || payload.hasVersion() || payload.hasKey())
         {
-            RequestCacheValue res = scaf.setResponseType(INVALID_OPTIONAL).build();
+            RequestCacheValue res = scaf.setResponseType(ResponseType.INVALID_OPTIONAL).build();
             return generateAndSend(res);
         }
 
@@ -806,7 +806,7 @@ public class KVServerTaskHandler implements Runnable {
         mapLock.writeLock().lock();
         map.clear();
         bytesUsed.set(0); //concurrently correct, because we are only thread with access to map
-        RequestCacheValue res = scaf.setResponseType(WIPEOUT).build();
+        RequestCacheValue res = scaf.setResponseType(ResponseType.WIPEOUT).build();
         DatagramPacket pkt = generateAndSend(res);
         mapLock.writeLock().unlock();
 
@@ -831,7 +831,7 @@ public class KVServerTaskHandler implements Runnable {
         ValueWrapper value = null;
 
         /* create response packet for receiving news */
-        RequestCacheValue response = scaf.setResponseType(OBITUARIES).setServerStatusCodes(serverStatusCodes).build();
+        RequestCacheValue response = scaf.setResponseType(ResponseType.OBITUARIES).setServerStatusCodes(serverStatusCodes).build();
         pkt = generateAndSend(response);
         return pkt;
     }
@@ -854,7 +854,7 @@ public class KVServerTaskHandler implements Runnable {
             }
             //the server update is about us
             else {
-                if (server.getCode() == CODE_DED) {
+                if (server.getCode() == ServerRecord.CODE_DED) {
                     ServerRecord r = ((ServerRecord) server);
                     if(self.getInformationTime() > r.getInformationTime() + 10_000)
                     {

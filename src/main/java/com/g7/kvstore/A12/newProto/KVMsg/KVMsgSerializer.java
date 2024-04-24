@@ -1,9 +1,9 @@
-package com.g7.CPEN431.A12.newProto.KVMsg;
+package com.g7.kvstore.A12.newProto.KVMsg;
 
-import com.g7.CPEN431.A12.newProto.shared.CurrentCursor;
-import com.g7.CPEN431.A12.newProto.shared.MessageFactory;
-import com.g7.CPEN431.A12.newProto.shared.ProtobufInputStream;
-import com.g7.CPEN431.A12.newProto.shared.ProtobufOutputStream;
+import com.g7.kvstore.A12.newProto.shared.CurrentCursor;
+import com.g7.kvstore.A12.newProto.shared.MessageFactory;
+import com.g7.kvstore.A12.newProto.shared.ProtobufInputStream;
+import com.g7.kvstore.A12.newProto.shared.ProtobufOutputStream;
 
 public final class KVMsgSerializer {
 public static byte[] serialize(KVMsg message) {

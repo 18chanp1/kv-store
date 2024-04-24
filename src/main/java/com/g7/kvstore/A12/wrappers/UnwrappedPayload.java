@@ -1,8 +1,8 @@
-package com.g7.CPEN431.A12.wrappers;
+package com.g7.kvstore.A12.wrappers;
 
-import com.g7.CPEN431.A12.newProto.KVRequest.KVRequest;
-import com.g7.CPEN431.A12.newProto.KVRequest.PutPair;
-import com.g7.CPEN431.A12.newProto.KVRequest.ServerEntry;
+import com.g7.kvstore.A12.newProto.KVRequest.KVRequest;
+import com.g7.kvstore.A12.newProto.KVRequest.PutPair;
+import com.g7.kvstore.A12.newProto.KVRequest.ServerEntry;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package com.g7.CPEN431.A12.wrappers;
+package com.g7.kvstore.A12.wrappers;
 
 /**
  * The type of data stored in the public buffer
