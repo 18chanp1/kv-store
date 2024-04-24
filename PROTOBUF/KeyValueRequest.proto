@@ -8,6 +8,7 @@ message ServerEntry {
 message PutPair {
     required bytes key = 300;
     required bytes value = 301;
+    required int32 version = 302;
 }
 
 message KVRequest {

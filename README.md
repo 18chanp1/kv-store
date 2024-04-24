@@ -1,10 +1,9 @@
-# Something about the A7
+# Something about the A12
 Group ID: 7
-Verification Code: 8ED311163D1E5151310CA99B4D8C9E92
+Verification Code: 40252CEFC4BBAE85DA750D7E84FF3926
 Used Run Command:
 ``` shell
-java -Xmx64m \
--XX:+UseCompressedOops \
+java -Xmx512m \
 --add-exports=java.base/jdk.internal.ref=ALL-UNNAMED \
 --add-exports=java.base/sun.nio.ch=ALL-UNNAMED \
 --add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED \
@@ -31,9 +30,4 @@ Please see ./scripts for details.
 4. Enter the amount of nodes on the first row of ./scripts/node_setup.txt
 5. Enter the starting port on the second row of ./scripts/node_setup.txt
 6. Paste a version of the evaluation client in the root directory ./
-
-
-## Proof of immediate termination
-See Line 451 in [KVServerTaskHandler.java](./src/main/java/com/g7/CPEN431/A7/KVServerTaskHandler.java)
-./src/main/java/com/g7/CPEN431/A7/KVServerTaskHandler.java
 

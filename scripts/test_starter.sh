@@ -12,7 +12,7 @@ ssh -o StrictHostKeyChecking=no $AWS_TEST "mkdir -p testjar"
 
 echo "copying eval client to remote"
 scp -o StrictHostKeyChecking=no \
-../a7_eval.jar $AWS_TEST:~/testjar/a7_eval.jar
+../a11_eval.jar $AWS_TEST:~/testjar/a11_eval.jar
 
 echo "copying server to remote"
 scp -o StrictHostKeyChecking=no \
