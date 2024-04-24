@@ -1,6 +1,4 @@
 # Something about the A12
-Group ID: 7
-Verification Code: 40252CEFC4BBAE85DA750D7E84FF3926
 Used Run Command:
 ``` shell
 java -Xmx512m \
@@ -19,9 +17,6 @@ java -Xmx512m \
 ## Additional Notes on Running
 Some scripts are provided starting a large number of nodes on AWS instances.
 Please see ./scripts for details. 
-
-### Prerequisites
-- You need to upload the CPEN 431 public key to the AWS instance
 
 ### Setup
 1. Enter the public IP of the 20-node Server AWS instance to ./scripts/aws_host.txt
